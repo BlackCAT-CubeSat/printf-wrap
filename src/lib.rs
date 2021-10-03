@@ -2,7 +2,7 @@
 
 //! Types and whatnot for safe use of printf(3)-style format strings.
 
-#[no_std]
+#![no_std]
 
 // We use `libc` for types.
 extern crate libc;
@@ -11,11 +11,11 @@ use core::ffi::c_void;
 use libc::c_char;
 
 /// An empty null-terminated string.
-const EMPTY_C_STRING: [c_char; 1] = [b'\0'];
+const EMPTY_C_STRING: [c_char; 1] = [b'\0' as c_char];
 
 /// Information about how a type may be used with C's printf(3)
 /// and similar functions.
-pub trait PrintfArgument {
+pub trait PrintfArgument: Sized {
     /// Whether the type is consistent with C's `char`.
     const IS_CHAR: bool = false;
     /// Whether the type is consistent with C's `short int`.
@@ -42,13 +42,13 @@ pub trait PrintfArgument {
     /// Whether the type is a slice of bytes.
     const IS_BYTE_SLICE: bool = false;
 
-    /// Provides `self` as a slice length and [`*const u8`] to the start
+    /// Provides `self` as a slice length and `*const u8` to the start
     /// of the slice.
     /// Only expected to be meaningful if `IS_BYTE_SLICE == true`.
     #[inline]
     fn as_byte_slice(self) -> (usize, *const u8) {
         const EMPTY_ARRAY: [u8; 0] = [];
-        let p: &'const [u8] = &EMPTY_ARRAY;
+        let p: &'static [u8] = &EMPTY_ARRAY;
         (p.len(), p.as_ptr())
     }
 
@@ -82,14 +82,14 @@ pub trait PrintfArgument {
 /// versa) is sensible or even valid;
 /// the use-case is for types where any bit-pattern is
 /// sensible and the types don't have non-trivial drop behavior.
-const fn is_compat<T: Sized, U: Sized>() {
+const fn is_compat<T: Sized, U: Sized>() -> bool {
     use core::mem::{size_of, align_of};
 
     size_of::<T>() == size_of::<U>() && align_of::<T>() == align_of::<U>()
 }
 
 macro_rules! impl_printf_arg_integer {
-    ( $( $t:ty $sign:expr ),* ) => {
+    ( $( $t:ty, $sign:expr );* ) => {
         $(
             impl PrintfArgument for $t {
                 const IS_SIGNED: bool = $sign;
@@ -109,19 +109,19 @@ macro_rules! impl_printf_arg_integer {
 }
 
 impl_printf_arg_integer! {
-    u8   false,
-    i8   true,
-    u16  false,
-    i16  true,
-    u32  false,
-    i32  true,
-    u64  false,
-    i64  true,
-    u128 false,
-    i128 true,
+    u8,   false;
+    i8,   true;
+    u16,  false;
+    i16,  true;
+    u32,  false;
+    i32,  true;
+    u64,  false;
+    i64,  true;
+    u128, false;
+    i128, true;
 
-    usize false,
-    isize true,
+    usize, false;
+    isize, true
 }
 
 impl PrintfArgument for f32 {
@@ -185,14 +185,11 @@ impl<T: Sized> PrintfArgument for *mut T {
 mod private {
 }
 
-pub const fn<T>
+//pub const fn<T>
 
-"%[-+0# ]*([1-9][0-9]*|\*)?(\.[1-9][0-9]*|\*)?([hlLjzt]|hh|ll)?[diouxXeEfFgGaAcsp]"
-
-
-/// The type content of a printf(3) conversion specifier (excepting "`%%`");
+/// The type content of a printf(3) conversion specification (excepting "`%%`"):
 /// the parts that define the number and types of arguments that are consumed.
-struct ConversionSpecifier {
+struct ConversionSpecification {
     width_is_arg: bool,
     precision_is_arg: bool,
     length_modifier: Option<LengthModifier>,
@@ -219,18 +216,22 @@ enum LengthModifier {
     Ptrdiff,
 }
 
+const fn c(x: u8) -> c_char { x as c_char }
+
 /// Returns the index of the initial '`%`'
 /// of the next non-`%%` conversion specifier, if present;
 /// else returns `None`.
 const fn next_conversion_specifier(fmt: &[c_char]) -> Option<usize> {
+    const PCT: c_char = b'%' as c_char;
+
     let len = fmt.len();
     let mut i: usize = 0;
 
     if len == 0 { return None; }
 
     while i < len {
-        if fmt[i] == b'%' {
-            if i < len-1 && fmt[i+1] == b'%' { // skip over '%%':
+        if fmt[i] == c(b'%') {
+            if i < len-1 && fmt[i+1] == c(b'%') { // skip over '%%':
                 i += 2;
             } else {
                 return Some(i);
@@ -247,7 +248,7 @@ const fn next_conversion_specifier(fmt: &[c_char]) -> Option<usize> {
 
 /// Is `s` (a candidate for being a C string) null-terminated?
 const fn is_null_terminated(s: &[c_char]) -> bool {
-    s.len() > 0 && s[s.len() - 1] == b'\0'
+    s.len() > 0 && s[s.len() - 1] == c(b'\0')
 }
 
 
