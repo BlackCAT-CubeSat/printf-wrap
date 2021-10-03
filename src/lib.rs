@@ -193,13 +193,13 @@ struct ConversionSpecification {
     width_is_arg: bool,
     precision_is_arg: bool,
     length_modifier: Option<LengthModifier>,
-    conversion: c_char,
+    specifier: ConvSpecifier,
 }
 
-/// A length modifier in a printf(3) conversion specifier.
+/// A length modifier in a printf(3) conversion specification.
 enum LengthModifier {
     /// `hh`
-    Char,
+    CharLen,
     /// `h`
     Short,
     /// `l`
@@ -216,14 +216,138 @@ enum LengthModifier {
     Ptrdiff,
 }
 
+/// The conversion specifier in a conversion specification, or, rather,
+/// an equivalence class with respect to acceptable argument types.
+enum ConvSpecifier {
+    /// `d`, `i`, `o`, `u`, `x`, or `X`
+    Integer,
+    /// `f`, `F`, `e`, `E`, `g`, `G`, `a`, or `A`
+    Double,
+    /// `c`
+    Char,
+    /// `s`
+    String,
+    /// `p`
+    Pointer,
+}
+
 const fn c(x: u8) -> c_char { x as c_char }
 
-/// Returns the index of the initial '`%`'
-/// of the next non-`%%` conversion specifier, if present;
-/// else returns `None`.
-const fn next_conversion_specifier(fmt: &[c_char]) -> Option<usize> {
-    const PCT: c_char = b'%' as c_char;
+/// If `fmt` begins with an acceptable printf(3) conversion specification,
+/// returns a pair consisting of a [`ConversionSpecification`] describing the
+/// specification and a `usize` containing the length (in `c_char`s) of the
+/// specification; otherwise returns `Err`.
+const fn parse_conversion_specification(fmt: &[c_char])
+    -> Result<(ConversionSpecification, usize), ()> {
+    use LengthModifier::*;
+    use ConvSpecifier::*;
 
+    let len = fmt.len();
+
+    if len < 2 { return Err(()); }
+
+    if fmt[0] != c(b'%') { return Err(()); }
+
+    let mut i = 1usize;
+
+    // skip over flag characters ('-+#0 )
+    while i < len {
+        match fmt[i] as u8 {
+            b'\'' | b'-' | b'+' | b'#' | b'0' | b' ' => (),
+            _ => { break; }
+        };
+        i += 1;
+    }
+
+    // There must be more to the conversion specification at this point:
+    if i >= len { return Err(()); }
+
+    // See whether the field width (if any) is '*':
+    let width_is_arg = match fmt[i] as u8 {
+        b'*' => { i += 1; true },
+        _ => {
+            // Skip over any digits; if they exist, they're the field width.
+            while i < len && (fmt[i] as u8).is_ascii_digit() { i += 1; }
+            false
+        }
+    };
+
+    // Must still be more:
+    if i >= len { return Err(()); }
+
+    // If the next character is '.', we have a precision:
+    let precision_is_arg = if fmt[i] != c(b'.') {
+        false
+    } else {
+        i += 1;
+        if i >= len { return Err(()); }
+        if fmt[i] == c(b'*') {
+            i += 1;
+            true
+        } else {
+            // Skip over any decimal digits -- they're part of the precision
+            while i < len && (fmt[i] as u8).is_ascii_digit() { i += 1; }
+            false
+        }
+    };
+
+    // Must still be yet more:
+    if i >= len { return Err(()); }
+
+    // OK, look for a length modifier, if any:
+    let length_modifier: Option<LengthModifier> = match fmt[i] as u8 {
+        b'h' => {
+            i += 1;
+            if i < len && fmt[i] == c(b'h') {
+                i += 1;
+                Some(CharLen)
+            } else {
+                Some(Short)
+            }
+        },
+        b'l' => {
+            i += 1;
+            if i < len && fmt[i] == c(b'l') {
+                i += 1;
+                Some(LongLong)
+            } else {
+                Some(Long)
+            }
+        },
+        b'j' => { i += 1; Some(Max) },
+        b'z' => { i += 1; Some(Size) },
+        b't' => { i += 1; Some(Ptrdiff) },
+        _ => None,
+    };
+
+    // Must still be at least one more character:
+    if i >= len { return Err(()); }
+
+    // We've passed over any previous parts of the specification, so the
+    // next character *must* be the conversion specifier:
+    let spec: ConvSpecifier = match fmt[i] as u8 {
+        b'd' | b'i' | b'o' | b'u' | b'x' | b'X' => { Integer },
+        b'f' | b'F' | b'e' | b'E' | b'g' | b'G' | b'a' | b'A' => { Double },
+        b'c' => { Char },
+        b's' => { String },
+        b'p' => { Pointer },
+        _ => { return Err(()); },
+    };
+
+    let conv = ConversionSpecification {
+        width_is_arg: width_is_arg,
+        precision_is_arg: precision_is_arg,
+        length_modifier: length_modifier,
+        specifier: spec,
+    };
+
+    Ok((conv, i+1))
+}
+
+/// Returns the index of the initial '`%`'
+/// of the next non-`%%` conversion specification, if present;
+/// else returns `None`.
+const fn next_conversion_specification(fmt: &[c_char]) -> Option<usize> {
     let len = fmt.len();
     let mut i: usize = 0;
 
@@ -242,7 +366,7 @@ const fn next_conversion_specifier(fmt: &[c_char]) -> Option<usize> {
     }
 
     // if we get here, we got to the end of the string without hitting a
-    // conversion specifier:
+    // conversion specification:
     None
 }
 
