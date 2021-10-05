@@ -4,18 +4,70 @@
 
 #![no_std]
 
+#![feature(const_fn_trait_bound)]
+
 // We use `libc` for types.
 extern crate libc;
 
 use core::ffi::c_void;
 use libc::c_char;
 
-/// An empty null-terminated string.
+/// A wrapper for a null-terminated string.
+///
+/// Sometimes used in favor of `std`'s `CStr` or `CString` types,
+/// as these can be made as compile-time constants.
+#[derive(Clone, Copy)]
+pub struct NulString {
+    s: *const c_char
+}
+
+impl NulString {
+    /// Creates a [`NulString`] from a `s`, a static `&str`,
+    /// or panics if `s` is not null-terminated.
+    #[allow(unconditional_panic)]
+    #[deny(const_err)]
+    pub const fn new(s: &'static str) -> NulString {
+        const PANIC: [c_char; 0] = [];
+        const NOT_NULL_TERMINATED: usize = 42;
+
+        let bytes = s.as_bytes();
+        if bytes.len() == 0 || bytes[bytes.len() - 1] != b'\0' {
+            // out-of-bounds reference as a workaround for not being able
+            // to panic!() in a const fn
+            let x: &c_char = &PANIC[NOT_NULL_TERMINATED];
+            return NulString { s: x as *const c_char };
+        }
+
+        NulString { s: bytes.as_ptr() as *const c_char }
+    }
+
+    #[inline]
+    pub const fn as_ptr(self) -> *const c_char {
+        self.s
+    }
+}
+
+#[macro_export]
+macro_rules! c_str {
+    ($str:expr) => {
+        {
+            const CSTR: NulString = $crate::NulString::new(concat!($str, "\0"));
+            CSTR
+        }
+    };
+}
+
+/// An empty null-terminated string; used in some default implementations
+/// of methods in [`PrintfArgument`].
 const EMPTY_C_STRING: [c_char; 1] = [b'\0' as c_char];
+
+pub trait LargerOfOp<Rhs> {
+    type Output;
+}
 
 /// Information about how a type may be used with C's printf(3)
 /// and similar functions.
-pub trait PrintfArgument: Sized {
+pub trait PrintfArgument: Sized + Copy {
     /// Whether the type is consistent with C's `char`.
     const IS_CHAR: bool = false;
     /// Whether the type is consistent with C's `short int`.
@@ -39,17 +91,11 @@ pub trait PrintfArgument: Sized {
     /// Whether the type is floating-point.
     const IS_FLOAT: bool = false;
 
-    /// Whether the type is a slice of bytes.
-    const IS_BYTE_SLICE: bool = false;
-
-    /// Provides `self` as a slice length and `*const u8` to the start
-    /// of the slice.
-    /// Only expected to be meaningful if `IS_BYTE_SLICE == true`.
+    /// Provides `self` as a [`libc::c_double`].
+    /// Only expected to be meaningful if `Self::IS_FLOAT == true`.
     #[inline]
-    fn as_byte_slice(self) -> (usize, *const u8) {
-        const EMPTY_ARRAY: [u8; 0] = [];
-        let p: &'static [u8] = &EMPTY_ARRAY;
-        (p.len(), p.as_ptr())
+    fn as_double(self) -> libc::c_double {
+        0.0 as libc::c_double
     }
 
     /// Whether the type is a null-terminated string.
@@ -57,7 +103,7 @@ pub trait PrintfArgument: Sized {
 
     /// Provides `self` as a [`*const c_char`] to a null-terminated (C-style)
     /// string.
-    /// Only expected to be meaningful if `IS_C_STRING == true`.
+    /// Only expected to be meaningful if `Self::IS_C_STRING == true`.
     #[inline]
     fn as_c_string(self) -> *const c_char {
         EMPTY_C_STRING.as_ptr()
@@ -67,7 +113,7 @@ pub trait PrintfArgument: Sized {
     const IS_POINTER: bool = false;
 
     /// Provides `self` as a [`*const c_void`].
-    /// Only expected to be meaningful if `IS_POINTER == true`.
+    /// Only expected to be meaningful if `Self::IS_POINTER == true`.
     #[inline]
     fn as_pointer(self) -> *const c_void {
         EMPTY_C_STRING.as_ptr() as *const c_void
@@ -89,10 +135,10 @@ const fn is_compat<T: Sized, U: Sized>() -> bool {
 }
 
 macro_rules! impl_printf_arg_integer {
-    ( $( $t:ty, $sign:expr );* ) => {
+    ( $( $t:ty, $signed:expr );* ) => {
         $(
             impl PrintfArgument for $t {
-                const IS_SIGNED: bool = $sign;
+                const IS_SIGNED: bool = $signed;
 
                 const IS_CHAR: bool      = is_compat::<$t, libc::c_char>();
                 const IS_SHORT: bool     = is_compat::<$t, libc::c_short>();
@@ -126,41 +172,19 @@ impl_printf_arg_integer! {
 
 impl PrintfArgument for f32 {
     const IS_FLOAT: bool = true;
+
+    #[inline]
+    fn as_double(self) -> libc::c_double {
+        self as libc::c_double
+    }
 }
 
 impl PrintfArgument for f64 {
     const IS_FLOAT: bool = true;
-}
-
-impl PrintfArgument for &[u8] {
-    const IS_BYTE_SLICE: bool = true;
 
     #[inline]
-    fn as_byte_slice(self) -> (usize, *const u8) {
-        (self.len(), self.as_ptr())
-    }
-
-    const IS_POINTER: bool = true;
-
-    #[inline]
-    fn as_pointer(self) -> *const c_void {
-        self.as_ptr() as *const c_void
-    }
-}
-
-impl PrintfArgument for &[i8] {
-    const IS_BYTE_SLICE: bool = true;
-
-    #[inline]
-    fn as_byte_slice(self) -> (usize, *const u8) {
-        (self.len(), self.as_ptr() as *const u8)
-    }
-
-    const IS_POINTER: bool = true;
-
-    #[inline]
-    fn as_pointer(self) -> *const c_void {
-        self.as_ptr() as *const c_void
+    fn as_double(self) -> libc::c_double {
+        self as libc::c_double
     }
 }
 
@@ -182,17 +206,153 @@ impl<T: Sized> PrintfArgument for *mut T {
     }
 }
 
+impl PrintfArgument for NulString {
+    const IS_C_STRING: bool = true;
+
+    #[inline]
+    fn as_c_string(self) -> *const c_char {
+        self.as_ptr()
+    }
+
+    const IS_POINTER: bool = true;
+
+    #[inline]
+    fn as_pointer(self) -> *const c_void {
+        self.as_ptr() as *const c_void
+    }
+}
+
+pub trait PrintfArgs {
+    type AsList: PrintfArgsList;
+}
+
+impl<T: PrintfArgument> PrintfArgs for T {
+    type AsList = (T, ());
+}
+
+impl PrintfArgs for () {
+    type AsList = ();
+}
+
+macro_rules! nested_list_from_flat {
+    ($t:ident $(, $u:ident )*) => { ($t, nested_list_from_flat!($( $u ),*)) };
+    () => { () };
+}
+
+macro_rules! make_printf_arguments_tuple {
+    ($( $t:ident ),+) => {
+        impl<$( $t ),+> PrintfArgs for ($( $t, )+)
+            where $( $t: PrintfArgument ),+ {
+            type AsList = nested_list_from_flat!($( $t ),+);
+        }
+    };
+}
+
+make_printf_arguments_tuple!( T );
+make_printf_arguments_tuple!( T, U );
+make_printf_arguments_tuple!( T, U, V );
+make_printf_arguments_tuple!( T, U, V, W );
+make_printf_arguments_tuple!( T, U, V, W, X );
+make_printf_arguments_tuple!( T, U, V, W, X, Y );
+make_printf_arguments_tuple!( T, U, V, W, X, Y, Z );
+make_printf_arguments_tuple!( T, U, V, W, X, Y, Z, A );
+
+pub trait PrintfArgsList {
+    const IS_EMPTY: bool;
+
+    type First: PrintfArgument;
+    type Rest: PrintfArgsList;
+}
+
+impl PrintfArgsList for () {
+    const IS_EMPTY: bool = true;
+
+    type First = u8; // not really, but to fulfil the type constraint, we need *something* here.
+    type Rest = ();
+}
+
+impl<CAR: PrintfArgument, CDR: PrintfArgsList> PrintfArgsList for (CAR, CDR) {
+    const IS_EMPTY: bool = false;
+
+    type First = CAR;
+    type Rest = CDR;
+}
+
 mod private {
 }
 
-//pub const fn<T>
+pub const fn does_fmt_match_args<T: PrintfArgs>(fmt: &[c_char]) -> bool {
+    if !is_null_terminated(fmt) { return false; }
+    does_fmt_match_args_list::<T::AsList>(fmt, 0)
+}
+
+const fn does_fmt_match_args_list<T: PrintfArgsList>(fmt: &[c_char], start_idx: usize) -> bool {
+    use LengthModifier as LM;
+    use ConvSpecifier as CS;
+
+    match (next_conversion_specification(fmt, start_idx), T::IS_EMPTY) {
+        (None, true) => true,
+        (Some(conv_start), false) => {
+            if let Ok((spec, after_conv)) = parse_conversion_specification(fmt, conv_start) {
+                // See if we find grounds for rejection in the current
+                // conversion specification...
+
+                // (we currently don't support "*" in specifications)
+                if spec.width_is_arg || spec.precision_is_arg { return false; }
+
+                match spec.specifier {
+                    CS::Integer => {
+                        let is_compatible_type = match spec.length_modifier {
+                            None               => T::First::IS_INT,
+                            Some(LM::CharLen)  => T::First::IS_CHAR,
+                            Some(LM::Short)    => T::First::IS_SHORT,
+                            Some(LM::Long)     => T::First::IS_LONG,
+                            Some(LM::LongLong) => T::First::IS_LONG_LONG,
+                            Some(LM::Max)      => T::First::IS_MAX,
+                            Some(LM::Size)     => T::First::IS_SIZE,
+                            Some(LM::Ptrdiff)  => T::First::IS_PTRDIFF,
+                            Some(LM::LongDouble) => false,
+                        };
+
+                        if !is_compatible_type { return false; }
+                    },
+                    CS::Double => {
+                        if let Some(_) = spec.length_modifier { return false; }
+                        if !T::First::IS_FLOAT { return false; }
+                    },
+                    CS::Char => {
+                        if let Some(_) = spec.length_modifier { return false; }
+                        if !T::First::IS_CHAR { return false; }
+                    },
+                    CS::String => {
+                        if let Some(_) = spec.length_modifier { return false; }
+                        if !T::First::IS_C_STRING { return false; }
+                    },
+                    CS::Pointer => {
+                        if let Some(_) = spec.length_modifier { return false; }
+                        if !T::First::IS_POINTER { return false; }
+                    },
+                };
+
+                // ...and if not, recurse on the remainder of the format string
+                // and argument list.
+                does_fmt_match_args_list::<T::Rest>(fmt, after_conv)
+            } else { false }
+        },
+        _ => false,
+    }
+}
 
 /// The type content of a printf(3) conversion specification (excepting "`%%`"):
 /// the parts that define the number and types of arguments that are consumed.
 struct ConversionSpecification {
+    /// Whether the field width is a function argument (`*`).
     width_is_arg: bool,
+    /// Whether the precision is a function argument (`*`).
     precision_is_arg: bool,
+    /// The length modifier, if present.
     length_modifier: Option<LengthModifier>,
+    /// The conversion specifier.
     specifier: ConvSpecifier,
 }
 
@@ -233,22 +393,23 @@ enum ConvSpecifier {
 
 const fn c(x: u8) -> c_char { x as c_char }
 
-/// If `fmt` begins with an acceptable printf(3) conversion specification,
+/// If `fmt` has an acceptable printf(3) conversion specification starting
+/// at index `start_idx`,
 /// returns a pair consisting of a [`ConversionSpecification`] describing the
-/// specification and a `usize` containing the length (in `c_char`s) of the
-/// specification; otherwise returns `Err`.
-const fn parse_conversion_specification(fmt: &[c_char])
+/// specification and a `usize` containing the index of the
+/// first character after the specification; otherwise returns `Err`.
+const fn parse_conversion_specification(fmt: &[c_char], start_idx: usize)
     -> Result<(ConversionSpecification, usize), ()> {
     use LengthModifier::*;
     use ConvSpecifier::*;
 
     let len = fmt.len();
 
-    if len < 2 { return Err(()); }
+    if len < 2 || start_idx > len - 2 { return Err(()); }
 
-    if fmt[0] != c(b'%') { return Err(()); }
+    if fmt[start_idx] != c(b'%') { return Err(()); }
 
-    let mut i = 1usize;
+    let mut i = start_idx + 1;
 
     // skip over flag characters ('-+#0 )
     while i < len {
@@ -317,6 +478,7 @@ const fn parse_conversion_specification(fmt: &[c_char])
         b'j' => { i += 1; Some(Max) },
         b'z' => { i += 1; Some(Size) },
         b't' => { i += 1; Some(Ptrdiff) },
+        b'L' => { i += 1; Some(LongDouble) },
         _ => None,
     };
 
@@ -344,12 +506,12 @@ const fn parse_conversion_specification(fmt: &[c_char])
     Ok((conv, i+1))
 }
 
-/// Returns the index of the initial '`%`'
-/// of the next non-`%%` conversion specification, if present;
+/// Starting at index `start_idx`, returns the index of the initial '`%`'
+/// of the next non-`%%` conversion specification, if one is present;
 /// else returns `None`.
-const fn next_conversion_specification(fmt: &[c_char]) -> Option<usize> {
+const fn next_conversion_specification(fmt: &[c_char], start_idx: usize) -> Option<usize> {
     let len = fmt.len();
-    let mut i: usize = 0;
+    let mut i: usize = start_idx;
 
     if len == 0 { return None; }
 
@@ -370,9 +532,20 @@ const fn next_conversion_specification(fmt: &[c_char]) -> Option<usize> {
     None
 }
 
-/// Is `s` (a candidate for being a C string) null-terminated?
+/// Is `s` (a candidate for being a C string) null-terminated, and does
+/// it have a null character _only_ at the very end?
 const fn is_null_terminated(s: &[c_char]) -> bool {
-    s.len() > 0 && s[s.len() - 1] == c(b'\0')
+    let mut i: usize = 0;
+
+    while i < s.len() {
+        if s[i] == c(b'\0') {
+            return i == (s.len() - 1);
+        }
+        i += 1;
+    }
+
+    // If we get here, there's no null character at all:
+    false
 }
 
 
