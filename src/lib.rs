@@ -10,6 +10,125 @@
 extern crate libc;
 
 use core::ffi::c_void;
+use libc::{c_char, c_int, c_uint, c_double};
+
+use crate::private::PrintfArgumentPrivate;
+
+
+/// Traits used to implement private details of [sealed traits].
+///
+/// [sealed traits]: https://rust-lang.github.io/api-guidelines/future-proofing.html
+mod private {
+    ///
+    pub trait PrintfArgumentPrivate {
+    }
+}
+
+macro_rules! impl_empty_trait {
+    ($trait_name:ident ; $($implementor:ty),*) => {
+        $(
+            impl $trait_name for $implementor { }
+        )*
+    };
+}
+
+/// A Rust-side argument to a safe wrapper around a printf(3)-like function.
+///
+/// This is a [sealed trait]; consumers of this crate are not allowed
+/// to create their own `impl`s, in order to unconditionally preserve
+/// safety.
+///
+/// [sealed trait]: https://rust-lang.github.io/api-guidelines/future-proofing.html
+pub trait PrintfArgument: PrintfArgumentPrivate + Copy {
+    /// The type corresponding to `Self` we should _really_ send as
+    /// an argument to a printf(3)-like function.
+    type CPrintfType;
+
+    /// Converts `self` to a value suitable for sending to printf(3).
+    fn as_c_val(self) -> Self::CPrintfType;
+}
+
+impl_empty_trait!(PrintfArgumentPrivate; u8, u16);
+
+impl PrintfArgument for u8 {
+    type CPrintfType = c_uint;
+
+    fn as_c_val(self) -> c_uint { self as c_uint }
+}
+
+
+pub trait PrintfArgs {
+    type AsList: PrintfArgsList;
+}
+
+pub trait PrintfArgsList {
+    const IS_EMPTY: bool;
+
+    type First: PrintfArgument;
+    type Rest: PrintfArgsList;
+}
+
+impl PrintfArgsList for () {
+    const IS_EMPTY: bool = true;
+
+    type First = u8; // not really, but to fulfil the type constraint, we need *something* here.
+    type Rest = ();
+}
+
+
+const fn c(x: u8) -> c_char { x as c_char }
+
+// This array is used by functions below to panic at compile time:
+// we can't use panic!() in `const fn`s,
+// but out-of-bounds indices work as a surrogate.
+const PANIC: [u8; 0] = [];
+
+// "Indices" to use with PANIC
+const NOT_NULL_TERMINATED: usize = 42;
+
+macro_rules! compile_time_panic {
+    ($cond:tt, $reason:tt) => {
+        if $cond {
+            return PANIC[$reason] != 0;
+        }
+    };
+}
+
+#[allow(unconditional_panic)]
+pub const fn does_fmt_match_args<T: PrintfArgs>(fmt: &[c_char], panic_on_false: bool) -> bool {
+    let pf = panic_on_false;
+
+    if !is_null_terminated(fmt) {
+        compile_time_panic!(pf, NOT_NULL_TERMINATED);
+    }
+    does_fmt_match_args_list::<T::AsList>(fmt, 0, panic_on_false)
+}
+
+const fn does_fmt_match_args_list<T: PrintfArgsList>(fmt: &[c_char], start_idx: usize, panic_on_false: bool) -> bool {
+   let pf = panic_on_false;
+
+   false
+}
+
+/// Is `s` (a candidate for being a C string) null-terminated, and does
+/// it have a null character _only_ at the very end?
+const fn is_null_terminated(s: &[c_char]) -> bool {
+    let mut i: usize = 0;
+
+    while i < s.len() {
+        if s[i] == c(b'\0') {
+            return i == (s.len() - 1);
+        }
+        i += 1;
+    }
+
+    // If we get here, there's no null character at all:
+    false
+}
+
+
+mod take1 {
+use core::ffi::c_void;
 use libc::c_char;
 
 /// A wrapper for a null-terminated string.
@@ -47,15 +166,15 @@ impl NulString {
     }
 }
 
-#[macro_export]
-macro_rules! c_str {
-    ($str:expr) => {
-        {
-            const CSTR: NulString = $crate::NulString::new(concat!($str, "\0"));
-            CSTR
-        }
-    };
-}
+//#[macro_export]
+//macro_rules! c_str {
+//    ($str:expr) => {
+//        {
+//            const CSTR: NulString = $crate::NulString::new(concat!($str, "\0"));
+//            CSTR
+//        }
+//    };
+//}
 
 /// An empty null-terminated string; used in some default implementations
 /// of methods in [`PrintfArgument`].
@@ -555,4 +674,5 @@ mod tests {
     fn it_works() {
         assert_eq!(2 + 2, 4);
     }
+}
 }
