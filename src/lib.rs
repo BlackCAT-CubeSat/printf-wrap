@@ -2,9 +2,35 @@
 
 //! Types and whatnot for safe use of printf(3)-style format strings.
 
+// https://pubs.opengroup.org/onlinepubs/9699919799/functions/printf.html
+// https://man7.org/linux/man-pages/man3/printf.3.html
+// https://www.freebsd.org/cgi/man.cgi?printf%283%29
+
 #![no_std]
 
 #![feature(const_fn_trait_bound)]
+
+// We engage in a little naughtiness where we rely on two arguments to
+// functions and the two elements of the following structs (when used as
+// a single argument to a function) being laid out in same way always:
+//
+// StrSlice
+// StarredArgument
+//
+// This is not guaranteed to be true in general, but is true for the
+// following architectures and ABIs (using OSes as a proxy for ABI):
+#[cfg(all(
+    any(target_arch = "x86", target_arch = "x86_64", target_arch = "arm"),
+    any(target_os = "linux", target_os = "android", target_os = "freebsd",
+        target_os = "dragonfly", target_os = "openbsd", target_os = "netbsd")
+))]
+
+// We only aim for compatibility with printf(3) as specified in POSIX:
+#[cfg(unix)]
+
+/// Marker structure used to ensure this crate only compiles on
+/// known-compatible (architecture, ABI) pairs.
+struct CompatibleSystem { }
 
 // We use `libc` for types.
 extern crate libc;
@@ -47,7 +73,7 @@ pub trait PrintfArgument: PrintfArgumentPrivate + Copy {
     /// Converts `self` to a value suitable for sending to printf(3).
     fn as_c_val(self) -> Self::CPrintfType;
 
-    const NUM_STARS: usize = 0;
+    const NUM_STARS_USED: usize = 0;
     const NEEDS_STAR_PRECISION: bool = false;
 }
 
@@ -73,23 +99,57 @@ impl PrintfArgument for u16 {
 }
 
 #[repr(C)]
-pub struct StarredArgument<T> {
-    star_arg: c_int,
-    arg: T,
+pub struct StrSlice {
+    sz: usize,
+    ptr: *const u8,
+}
+
+// Because &str's CPrintfType already takes up two 8-byte words on x86_64,
+// we can't allow this to be used with a(n additional) star argument in
+// a tuple (otherwise the structure will not always be laid out as a
+// function argument in the same manner as the corresponding disaggregated
+// values (treated as multiple arguments),
+// so this isn't also `PrimitivePrintArgument`.
+impl PrintfArgumentPrivate for &str { }
+
+impl PrintfArgument for &str {
+    const NUM_STARS_USED: usize = 1;
+    const NEEDS_STAR_PRECISION: bool = true;
+
+    type CPrintfType = StrSlice;
+
+    #[inline]
+    fn as_c_val(self) -> StrSlice {
+        StrSlice {
+            sz: self.len(),
+            ptr: self.as_ptr(),
+        }
+    }
+}
+
+#[cfg(not(target_arch = "x86_64"))]
+#[repr(C)]
+pub struct IntArg {
+  n: c_int,
+}
+
+#[cfg(target_arch = "x86_64")]
+#[repr(C)]
+pub union IntArg {
+    n: c_int,
+    _ll: u64,
 }
 
 #[repr(C)]
-pub struct TwoStarredArgument<T> {
-    star_arg1: c_int,
-    star_arg2: c_int,
+pub struct StarredArgument<T> {
+    star_arg: IntArg,
     arg: T,
 }
 
 impl<T: PrimitivePrintfArgument> PrintfArgumentPrivate for (c_int, T) { }
-impl<T: PrimitivePrintfArgument> PrintfArgumentPrivate for (c_int, c_int, T) { }
 
 impl<T: PrimitivePrintfArgument> PrintfArgument for (c_int, T) {
-    const NUM_STARS: usize = T::NUM_STARS + 1;
+    const NUM_STARS_USED: usize = T::NUM_STARS_USED + 1;
     const NEEDS_STAR_PRECISION: bool = T::NEEDS_STAR_PRECISION;
 
     type CPrintfType = StarredArgument<T::CPrintfType>;
@@ -97,24 +157,8 @@ impl<T: PrimitivePrintfArgument> PrintfArgument for (c_int, T) {
     #[inline]
     fn as_c_val(self) -> StarredArgument<T::CPrintfType> {
         StarredArgument {
-            star_arg: self.0,
+            star_arg: IntArg { n: self.0 },
             arg: self.1.as_c_val(),
-        }
-    }
-}
-
-impl<T: PrimitivePrintfArgument> PrintfArgument for (c_int, c_int, T) {
-    const NUM_STARS: usize = T::NUM_STARS + 1;
-    const NEEDS_STAR_PRECISION: bool = T::NEEDS_STAR_PRECISION;
-
-    type CPrintfType = TwoStarredArgument<T::CPrintfType>;
-
-    #[inline]
-    fn as_c_val(self) -> TwoStarredArgument<T::CPrintfType> {
-        TwoStarredArgument {
-            star_arg1: self.0,
-            star_arg2: self.1,
-            arg: self.2.as_c_val(),
         }
     }
 }
