@@ -17,8 +17,8 @@
 // StrSlice
 // StarredArgument
 //
-// This is not guaranteed to be true in general, but is true for the
-// following architectures and ABIs (using OSes as a proxy for ABI):
+// This is not guaranteed to be true in general, but is known to be true
+// for the following architectures and ABIs (using OSes as a proxy for ABI):
 #[cfg(all(
     any(target_arch = "x86", target_arch = "x86_64", target_arch = "arm"),
     any(target_os = "linux", target_os = "android", target_os = "freebsd",
@@ -28,13 +28,14 @@
 // We only aim for compatibility with printf(3) as specified in POSIX:
 #[cfg(unix)]
 
-/// Marker structure used to ensure this crate only compiles on
+/// Marker structure used to ensure this crate only sucessfully compiles for
 /// known-compatible (architecture, ABI) pairs.
 struct CompatibleSystem { }
 
 // We use `libc` for types.
 extern crate libc;
 
+use core::marker::PhantomData;
 use core::ffi::c_void;
 use libc::{c_char, c_int, c_uint, c_double};
 
@@ -83,6 +84,21 @@ pub trait PrimitivePrintfArgument: PrintfArgument { }
 
 impl_empty_trait!(PrintfArgumentPrivate; u8, u16);
 impl_empty_trait!(PrimitivePrintfArgument; u8, u16);
+
+/// Are types `T` and `U` ABI-compatible, in the sense that using
+/// one in the place of the other wouldn't affect structure layout,
+/// stack layout if used as arguments (assuming they're both integer-like),
+/// etc.?
+///
+/// Note that this doesn't check for whether substituting `T` with `U` (or vice
+/// versa) is sensible or even valid;
+/// the use-case is for types where any bit-pattern is
+/// sensible and the types don't have non-trivial drop behavior.
+const fn is_compat<T: Sized, U: Sized>() -> bool {
+    use core::mem::{size_of, align_of};
+
+    size_of::<T>() == size_of::<U>() && align_of::<T>() == align_of::<U>()
+}
 
 impl PrintfArgument for u8 {
     type CPrintfType = c_uint;
@@ -188,16 +204,23 @@ impl<CAR: PrintfArgument, CDR: PrintfArgsList> PrintfArgsList for (CAR, CDR) {
     type Rest = CDR;
 }
 
+pub struct PrintfFmt<T: PrintfArgs> {
+    fmt: *const c_char,
+    _x: CompatibleSystem,
+    _y: PhantomData<T>,
+}
 
+/// Utility conversion from [`u8`] to [`libc::c_char`].
 const fn c(x: u8) -> c_char { x as c_char }
 
-// This array is used by functions below to panic at compile time:
-// we can't use panic!() in `const fn`s,
-// but out-of-bounds indices work as a surrogate.
+/// This array is used by functions below to panic at compile time:
+/// we can't use panic!() in `const fn`s,
+/// but out-of-bounds indices work as a surrogate.
 const PANIC: [u8; 0] = [];
 
 // "Indices" to use with PANIC
 const NOT_NULL_TERMINATED: usize = 42;
+const U8_IS_NOT_CHAR_SIZED: usize = 43;
 
 macro_rules! compile_time_panic {
     ($cond:tt, $reason:tt) => {
@@ -207,8 +230,43 @@ macro_rules! compile_time_panic {
     };
 }
 
+const EMPTY_C_STRING: *const c_char = &c(b'\0') as *const c_char;
+
+impl<T: PrintfArgs> PrintfFmt<T> {
+    #[allow(unconditional_panic)]
+    const fn from_str(fmt: &'static str) -> Self {
+        if !is_compat::<u8, c_char>() {
+            let p = &PANIC[U8_IS_NOT_CHAR_SIZED] as *const u8 as *const c_char;
+            return PrintfFmt {
+                fmt: p,
+                _x: CompatibleSystem { },
+                _y: PhantomData,
+            };
+        }
+        let fmt_as_cstr: &'static [c_char] = unsafe {
+            // Following is safe, as (1) we've verified u8 has the same
+            // size and alignment as c_char and (2) references to T have the
+            // same layout as pointers to T
+            core::mem::transmute(fmt.as_bytes() as *const [u8] as *const [c_char])
+        };
+        let s = if is_fmt_valid::<T>(fmt_as_cstr, true) { fmt_as_cstr.as_ptr() }
+        else { EMPTY_C_STRING };
+
+        PrintfFmt {
+            fmt: s,
+            _x: CompatibleSystem { },
+            _y: PhantomData,
+        }
+    }
+}
+
+/// Returns whether `fmt` is (1) a valid C-style string and (2) a format
+/// string compatible with the tuple of arguments `T` when used in a
+/// printf(3)-like function.
+///
+/// If `panic_on_false` is true, panics instead of returning `false`.
 #[allow(unconditional_panic)]
-pub const fn does_fmt_match_args<T: PrintfArgs>(fmt: &[c_char], panic_on_false: bool) -> bool {
+pub const fn is_fmt_valid<T: PrintfArgs>(fmt: &[c_char], panic_on_false: bool) -> bool {
     let pf = panic_on_false;
 
     if !is_null_terminated(fmt) {
