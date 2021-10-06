@@ -35,7 +35,7 @@ macro_rules! impl_empty_trait {
 /// A Rust-side argument to a safe wrapper around a printf(3)-like function.
 ///
 /// This is a [sealed trait]; consumers of this crate are not allowed
-/// to create their own `impl`s, in order to unconditionally preserve
+/// to create their own `impl`s in order to unconditionally preserve
 /// safety.
 ///
 /// [sealed trait]: https://rust-lang.github.io/api-guidelines/future-proofing.html
@@ -46,16 +46,78 @@ pub trait PrintfArgument: PrintfArgumentPrivate + Copy {
 
     /// Converts `self` to a value suitable for sending to printf(3).
     fn as_c_val(self) -> Self::CPrintfType;
+
+    const NUM_STARS: usize = 0;
+    const NEEDS_STAR_PRECISION: bool = false;
 }
 
+/// Marker trait for implementors of [`PrintfArgument`] that are not
+/// tuples (which are used with conversion specifications involving stars).
+pub trait PrimitivePrintfArgument: PrintfArgument { }
+
 impl_empty_trait!(PrintfArgumentPrivate; u8, u16);
+impl_empty_trait!(PrimitivePrintfArgument; u8, u16);
 
 impl PrintfArgument for u8 {
     type CPrintfType = c_uint;
 
+    #[inline]
     fn as_c_val(self) -> c_uint { self as c_uint }
 }
 
+impl PrintfArgument for u16 {
+    type CPrintfType = c_uint;
+
+    #[inline]
+    fn as_c_val(self) -> c_uint { self as c_uint }
+}
+
+#[repr(C)]
+pub struct StarredArgument<T> {
+    star_arg: c_int,
+    arg: T,
+}
+
+#[repr(C)]
+pub struct TwoStarredArgument<T> {
+    star_arg1: c_int,
+    star_arg2: c_int,
+    arg: T,
+}
+
+impl<T: PrimitivePrintfArgument> PrintfArgumentPrivate for (c_int, T) { }
+impl<T: PrimitivePrintfArgument> PrintfArgumentPrivate for (c_int, c_int, T) { }
+
+impl<T: PrimitivePrintfArgument> PrintfArgument for (c_int, T) {
+    const NUM_STARS: usize = T::NUM_STARS + 1;
+    const NEEDS_STAR_PRECISION: bool = T::NEEDS_STAR_PRECISION;
+
+    type CPrintfType = StarredArgument<T::CPrintfType>;
+
+    #[inline]
+    fn as_c_val(self) -> StarredArgument<T::CPrintfType> {
+        StarredArgument {
+            star_arg: self.0,
+            arg: self.1.as_c_val(),
+        }
+    }
+}
+
+impl<T: PrimitivePrintfArgument> PrintfArgument for (c_int, c_int, T) {
+    const NUM_STARS: usize = T::NUM_STARS + 1;
+    const NEEDS_STAR_PRECISION: bool = T::NEEDS_STAR_PRECISION;
+
+    type CPrintfType = TwoStarredArgument<T::CPrintfType>;
+
+    #[inline]
+    fn as_c_val(self) -> TwoStarredArgument<T::CPrintfType> {
+        TwoStarredArgument {
+            star_arg1: self.0,
+            star_arg2: self.1,
+            arg: self.2.as_c_val(),
+        }
+    }
+}
 
 pub trait PrintfArgs {
     type AsList: PrintfArgsList;
@@ -73,6 +135,13 @@ impl PrintfArgsList for () {
 
     type First = u8; // not really, but to fulfil the type constraint, we need *something* here.
     type Rest = ();
+}
+
+impl<CAR: PrintfArgument, CDR: PrintfArgsList> PrintfArgsList for (CAR, CDR) {
+    const IS_EMPTY: bool = false;
+
+    type First = CAR;
+    type Rest = CDR;
 }
 
 
@@ -100,10 +169,12 @@ pub const fn does_fmt_match_args<T: PrintfArgs>(fmt: &[c_char], panic_on_false: 
 
     if !is_null_terminated(fmt) {
         compile_time_panic!(pf, NOT_NULL_TERMINATED);
+        return false;
     }
     does_fmt_match_args_list::<T::AsList>(fmt, 0, panic_on_false)
 }
 
+#[allow(unconditional_panic)]
 const fn does_fmt_match_args_list<T: PrintfArgsList>(fmt: &[c_char], start_idx: usize, panic_on_false: bool) -> bool {
    let pf = panic_on_false;
 
