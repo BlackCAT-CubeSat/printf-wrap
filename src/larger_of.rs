@@ -1,3 +1,5 @@
+// Copyright (c) 2021 The Pennsylvania State University. All rights reserved.
+
 //! Implementations of [`LargerOfOp`].
 
 use crate::LargerOfOp;
