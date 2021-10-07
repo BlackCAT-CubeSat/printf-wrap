@@ -59,6 +59,8 @@ macro_rules! impl_empty_trait {
     };
 }
 
+mod larger_of;
+
 /// A Rust-side argument to a safe wrapper around a printf(3)-like function.
 ///
 /// This is a [sealed trait]; consumers of this crate are not allowed
@@ -100,6 +102,15 @@ const fn is_compat<T: Sized, U: Sized>() -> bool {
     size_of::<T>() == size_of::<U>() && align_of::<T>() == align_of::<U>()
 }
 
+/// Utility trait for determining which of two integer types is larger.
+pub trait LargerOfOp<Rhs> {
+    /// If `Rhs` is a larger type than `Self`, this should be `Rhs`; otherwise
+    /// it should be `Self`.
+    type Output;
+}
+
+pub type LargerOf<T, U> = <T as LargerOfOp<U>>::Output;
+
 impl PrintfArgument for u8 {
     type CPrintfType = c_uint;
 
@@ -122,10 +133,10 @@ pub struct StrSlice {
 
 // Because &str's CPrintfType already takes up two 8-byte words on x86_64,
 // we can't allow this to be used with a(n additional) star argument in
-// a tuple (otherwise the structure will not always be laid out as a
-// function argument in the same manner as the corresponding disaggregated
-// values (treated as multiple arguments),
-// so this isn't also `PrimitivePrintArgument`.
+// a tuple (otherwise the `CPrintType` structure will not always be laid
+// out as a function argument in the same manner as the corresponding
+// disaggregated values (treated as multiple arguments)),
+// so &str isn't also `PrimitivePrintArgument`.
 impl PrintfArgumentPrivate for &str { }
 
 impl PrintfArgument for &str {
@@ -204,6 +215,9 @@ impl<CAR: PrintfArgument, CDR: PrintfArgsList> PrintfArgsList for (CAR, CDR) {
     type Rest = CDR;
 }
 
+/// A type-safe wrapper around a C-style string verified to be compatible
+/// with use as a format string for printf(3)-style functions called with
+/// `T` as the varargs.
 pub struct PrintfFmt<T: PrintfArgs> {
     fmt: *const c_char,
     _x: CompatibleSystem,
