@@ -30,6 +30,7 @@
 
 /// Marker structure used to ensure this crate only sucessfully compiles for
 /// known-compatible (architecture, ABI) pairs.
+#[derive(Clone,Copy)]
 struct CompatibleSystem { }
 
 // We use `libc` for types.
@@ -320,9 +321,37 @@ impl<CAR: PrintfArgument, CDR: PrintfArgsList> PrintfArgsList for (CAR, CDR) {
     type Rest = CDR;
 }
 
+impl PrintfArgs for () {
+    type AsList = ();
+}
+
+macro_rules! nested_list_from_flat {
+    ($t:ident $(, $u:ident )*) => { ($t, nested_list_from_flat!($( $u ),*)) };
+    () => { () };
+}
+
+macro_rules! make_printf_arguments_tuple {
+    ($( $t:ident ),+) => {
+        impl<$( $t ),+> PrintfArgs for ($( $t, )+)
+            where $( $t: PrintfArgument ),+ {
+            type AsList = nested_list_from_flat!($( $t ),+);
+        }
+    };
+}
+
+make_printf_arguments_tuple!( T );
+make_printf_arguments_tuple!( T, U );
+make_printf_arguments_tuple!( T, U, V );
+make_printf_arguments_tuple!( T, U, V, W );
+make_printf_arguments_tuple!( T, U, V, W, X );
+make_printf_arguments_tuple!( T, U, V, W, X, Y );
+make_printf_arguments_tuple!( T, U, V, W, X, Y, Z );
+make_printf_arguments_tuple!( T, U, V, W, X, Y, Z, A );
+
 /// A type-safe wrapper around a C-style string verified to be compatible
 /// with use as a format string for printf(3)-style functions called with
 /// `T` as the varargs.
+#[derive(Clone, Copy)]
 pub struct PrintfFmt<T: PrintfArgs> {
     fmt: *const c_char,
     _x: CompatibleSystem,
@@ -377,13 +406,17 @@ impl<T: PrintfArgs> PrintfFmt<T> {
             _y: PhantomData,
         }
     }
+
+    pub fn as_ptr(self) -> *const c_char {
+        self.fmt
+    }
 }
 
 /// Returns whether `fmt` is (1) a valid C-style string and (2) a format
 /// string compatible with the tuple of arguments `T` when used in a
 /// printf(3)-like function.
 #[deny(unconditional_panic)]
-const fn is_fmt_valid<T: PrintfArgs>(fmt: &[c_char]) -> bool {
+pub const fn is_fmt_valid<T: PrintfArgs>(fmt: &[c_char]) -> bool {
     is_fmt_valid_for_args::<T>(fmt, false)
 }
 
@@ -393,6 +426,7 @@ const fn is_fmt_valid<T: PrintfArgs>(fmt: &[c_char]) -> bool {
 ///
 /// If `panic_on_false` is true, panics instead of returning `false`.
 #[allow(unconditional_panic)]
+#[inline]
 const fn is_fmt_valid_for_args<T: PrintfArgs>(fmt: &[c_char], panic_on_false: bool) -> bool {
     let pf = panic_on_false;
 
