@@ -78,14 +78,47 @@ pub trait PrintfArgument: PrintfArgumentPrivate + Copy {
 
     const NUM_STARS_USED: usize = 0;
     const NEEDS_STAR_PRECISION: bool = false;
+
+    /// Whether the type is consistent with C's `char`.
+    const IS_CHAR: bool = false;
+    /// Whether the type is consistent with C's `short int`.
+    const IS_SHORT: bool = false;
+    /// Whether the type is consistent with C's `int`.
+    const IS_INT: bool = false;
+    /// Whether the type is consistent with C's `long int`.
+    const IS_LONG: bool = false;
+    /// Whether the type is consistent with C's `long long int`.
+    const IS_LONG_LONG: bool = false;
+    /// Whether the type is consistent with C's `size_t`.
+    const IS_SIZE: bool = false;
+    /// Whether the type is consistent with C's `intmax_t`.
+    const IS_MAX: bool = false;
+    /// Whether the type is consistent with C's `ptrdiff_t`.
+    const IS_PTRDIFF: bool = false;
+
+    /// Whether the type is a signed integer type, as opposed to unsigned.
+    const IS_SIGNED: bool = false;
+
+    /// Whether the type is floating-point.
+    const IS_FLOAT: bool = false;
+
+    /// Whether the type is a null-terminated string.
+    const IS_C_STRING: bool = false;
+
+    /// Whether the type is a pointer.
+    const IS_POINTER: bool = false;
 }
 
 /// Marker trait for implementors of [`PrintfArgument`] that are not
 /// tuples (which are used with conversion specifications involving stars).
 pub trait PrimitivePrintfArgument: PrintfArgument { }
 
-impl_empty_trait!(PrintfArgumentPrivate; u8, u16);
-impl_empty_trait!(PrimitivePrintfArgument; u8, u16);
+impl_empty_trait!(PrintfArgumentPrivate;
+    u8, u16, u32, u64, usize, i8, i16, i32, i64, isize, f32, f64
+);
+impl_empty_trait!(PrimitivePrintfArgument;
+    u8, u16, u32, u64, usize, i8, i16, i32, i64, isize //, f32, f64
+);
 
 /// Are types `T` and `U` ABI-compatible, in the sense that using
 /// one in the place of the other wouldn't affect structure layout,
@@ -111,18 +144,47 @@ pub trait LargerOfOp<Rhs> {
 
 pub type LargerOf<T, U> = <T as LargerOfOp<U>>::Output;
 
-impl PrintfArgument for u8 {
-    type CPrintfType = c_uint;
+macro_rules! impl_printf_arg_integer {
+    ( $( $t:ty, $signed:expr, $int_type:ty );* ) => {
+        $(
+            impl PrintfArgument for $t {
+                const IS_SIGNED: bool = $signed;
 
-    #[inline]
-    fn as_c_val(self) -> c_uint { self as c_uint }
+                const IS_CHAR: bool      = is_compat::<$t, libc::c_char>();
+                const IS_SHORT: bool     = is_compat::<$t, libc::c_short>();
+                const IS_INT: bool       = is_compat::<$t, libc::c_int>();
+                const IS_LONG: bool      = is_compat::<$t, libc::c_long>();
+                const IS_LONG_LONG: bool = is_compat::<$t, libc::c_longlong>();
+
+                const IS_SIZE: bool      = is_compat::<$t, libc::size_t>();
+                const IS_MAX: bool       = is_compat::<$t, libc::intmax_t>();
+                const IS_PTRDIFF: bool   = is_compat::<$t, libc::ptrdiff_t>();
+
+                type CPrintfType = LargerOf<Self, $int_type>;
+
+                #[inline]
+                fn as_c_val(self) -> Self::CPrintfType {
+                    self as LargerOf<Self, $int_type>
+                }
+            }
+        )*
+    };
 }
 
-impl PrintfArgument for u16 {
-    type CPrintfType = c_uint;
+impl_printf_arg_integer! {
+    u8,   false, c_uint;
+    i8,   true,  c_int;
+    u16,  false, c_uint;
+    i16,  true,  c_int;
+    u32,  false, c_uint;
+    i32,  true,  c_int;
+    u64,  false, c_uint;
+    i64,  true,  c_int;
 
-    #[inline]
-    fn as_c_val(self) -> c_uint { self as c_uint }
+    // explicitly not implementing for {u128, i128} (no ABI guarantees)
+
+    usize, false, c_uint;
+    isize, true,  c_int
 }
 
 #[repr(C)]
@@ -144,6 +206,8 @@ impl PrintfArgument for &str {
     const NEEDS_STAR_PRECISION: bool = true;
 
     type CPrintfType = StrSlice;
+
+    const IS_C_STRING: bool = true;
 
     #[inline]
     fn as_c_val(self) -> StrSlice {
