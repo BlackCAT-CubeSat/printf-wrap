@@ -61,6 +61,51 @@ macro_rules! impl_empty_trait {
     };
 }
 
+/// A wrapper for a `'static` null-terminated string.
+///
+/// Sometimes used in favor of `std`'s `CStr` or `CString` types,
+/// as these can be made as compile-time constants.
+#[derive(Clone, Copy)]
+pub struct NullString {
+    s: *const c_char
+}
+
+impl NullString {
+    /// Creates a [`NullString`] from a `s`, a static `&str`,
+    /// or panics if `s` is not null-terminated.
+    #[allow(unconditional_panic)]
+    #[deny(const_err)]
+    pub const fn new(s: &'static str) -> NullString {
+        const PANIC: [c_char; 0] = [];
+        const NOT_NULL_TERMINATED: usize = 42;
+
+        let bytes = s.as_bytes();
+        if bytes.len() == 0 || bytes[bytes.len() - 1] != b'\0' {
+            // out-of-bounds reference as a workaround for not being able
+            // to panic!() in a const fn
+            let x: &c_char = &PANIC[NOT_NULL_TERMINATED];
+            return NullString { s: x as *const c_char };
+        }
+
+        NullString { s: bytes.as_ptr() as *const c_char }
+    }
+
+    /// Returns a pointer to the beginning of the wrapped string.
+    #[inline]
+    pub const fn as_ptr(self) -> *const c_char {
+        self.s
+    }
+}
+
+#[macro_export]
+macro_rules! null_str {
+    ($str:expr) => {
+        {
+            const STR: NullString = $crate::NullString::new(concat!($str, "\0"));
+            STR
+        }
+    };
+}
 
 /// A Rust-side argument to a safe wrapper around a printf(3)-like function.
 ///
@@ -771,54 +816,4 @@ const fn is_null_terminated(s: &[c_char]) -> bool {
 
     // If we get here, there's no null character at all:
     false
-}
-
-
-mod take1 {
-use libc::c_char;
-
-/// A wrapper for a null-terminated string.
-///
-/// Sometimes used in favor of `std`'s `CStr` or `CString` types,
-/// as these can be made as compile-time constants.
-#[derive(Clone, Copy)]
-pub struct NulString {
-    s: *const c_char
-}
-
-impl NulString {
-    /// Creates a [`NulString`] from a `s`, a static `&str`,
-    /// or panics if `s` is not null-terminated.
-    #[allow(unconditional_panic)]
-    #[deny(const_err)]
-    pub const fn new(s: &'static str) -> NulString {
-        const PANIC: [c_char; 0] = [];
-        const NOT_NULL_TERMINATED: usize = 42;
-
-        let bytes = s.as_bytes();
-        if bytes.len() == 0 || bytes[bytes.len() - 1] != b'\0' {
-            // out-of-bounds reference as a workaround for not being able
-            // to panic!() in a const fn
-            let x: &c_char = &PANIC[NOT_NULL_TERMINATED];
-            return NulString { s: x as *const c_char };
-        }
-
-        NulString { s: bytes.as_ptr() as *const c_char }
-    }
-
-    #[inline]
-    pub const fn as_ptr(self) -> *const c_char {
-        self.s
-    }
-}
-
-//#[macro_export]
-//macro_rules! c_str {
-//    ($str:expr) => {
-//        {
-//            const CSTR: NulString = $crate::NulString::new(concat!($str, "\0"));
-//            CSTR
-//        }
-//    };
-//}
 }
