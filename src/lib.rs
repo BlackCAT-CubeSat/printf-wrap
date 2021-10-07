@@ -97,6 +97,8 @@ impl NullString {
     }
 }
 
+/// Convenience macro for creating a [`NullString`]; it appends a null
+/// character for you!
 #[macro_export]
 macro_rules! null_str {
     ($str:expr) => {
@@ -441,7 +443,10 @@ const PRINTF_SPECIFIER_MISMATCH: usize = 48;
 const UNRECOGNIZED_CONVERSION_SPECIFICATION: usize = 49;
 const WRONG_NUMBER_OF_CONVERSIONS: usize = 50;
 
-macro_rules! compile_time_panic {
+/// If `$cond` is true, panic using `$reason` (used as an invalid array index).
+///
+/// This macro can be used at compile time, whereas [`panic!`] currently can't.
+macro_rules! if_then_panic {
     ($cond:tt, $reason:tt) => {
         if $cond {
             return PANIC[$reason] != 0;
@@ -510,7 +515,7 @@ const fn is_fmt_valid_for_args<T: PrintfArgs>(fmt: &[c_char], panic_on_false: bo
     let pf = panic_on_false;
 
     if !is_null_terminated(fmt) {
-        compile_time_panic!(pf, NOT_NULL_TERMINATED);
+        if_then_panic!(pf, NOT_NULL_TERMINATED);
         return false;
     }
     does_fmt_match_args_list::<T::AsList>(fmt, 0, panic_on_false)
@@ -587,12 +592,12 @@ const fn does_fmt_match_args_list<T: PrintfArgsList>(fmt: &[c_char], start_idx: 
                 let num_stars = (spec.width_is_arg as usize) + (spec.precision_is_arg as usize);
 
                 if num_stars != T::First::NUM_STARS_USED {
-                    compile_time_panic!(pf, WRONG_NUMBER_OF_STARS_IN_SPECIFICATION);
+                    if_then_panic!(pf, WRONG_NUMBER_OF_STARS_IN_SPECIFICATION);
                     return false;
                 }
 
                 if T::First::NEEDS_STAR_PRECISION && !spec.precision_is_arg {
-                    compile_time_panic!(pf, PRECISION_MUST_BE_STAR);
+                    if_then_panic!(pf, PRECISION_MUST_BE_STAR);
                     return false;
                 }
 
@@ -611,47 +616,47 @@ const fn does_fmt_match_args_list<T: PrintfArgsList>(fmt: &[c_char], start_idx: 
                         };
 
                         if !is_compatible_type {
-                            compile_time_panic!(pf, INTEGER_WIDTH_MISMATCH_IN_SPECIFICATION);
+                            if_then_panic!(pf, INTEGER_WIDTH_MISMATCH_IN_SPECIFICATION);
                             return false;
                         }
                     },
                     CS::Double => {
                         if let Some(_) = spec.length_modifier {
-                            compile_time_panic!(pf, UNSUPPORTED_LENGTH_MODIFIER);
+                            if_then_panic!(pf, UNSUPPORTED_LENGTH_MODIFIER);
                             return false;
                         }
                         if !T::First::IS_FLOAT {
-                            compile_time_panic!(pf, PRINTF_SPECIFIER_MISMATCH);
+                            if_then_panic!(pf, PRINTF_SPECIFIER_MISMATCH);
                             return false;
                         }
                     },
                     CS::Char => {
                         if let Some(_) = spec.length_modifier {
-                            compile_time_panic!(pf, UNSUPPORTED_LENGTH_MODIFIER);
+                            if_then_panic!(pf, UNSUPPORTED_LENGTH_MODIFIER);
                             return false;
                         }
                         if !T::First::IS_CHAR {
-                            compile_time_panic!(pf, PRINTF_SPECIFIER_MISMATCH);
+                            if_then_panic!(pf, PRINTF_SPECIFIER_MISMATCH);
                             return false;
                         }
                     },
                     CS::String => {
                         if let Some(_) = spec.length_modifier {
-                            compile_time_panic!(pf, UNSUPPORTED_LENGTH_MODIFIER);
+                            if_then_panic!(pf, UNSUPPORTED_LENGTH_MODIFIER);
                             return false;
                         }
                         if !T::First::IS_C_STRING {
-                            compile_time_panic!(pf, PRINTF_SPECIFIER_MISMATCH);
+                            if_then_panic!(pf, PRINTF_SPECIFIER_MISMATCH);
                             return false;
                         }
                     },
                     CS::Pointer => {
                         if let Some(_) = spec.length_modifier {
-                            compile_time_panic!(pf, UNSUPPORTED_LENGTH_MODIFIER);
+                            if_then_panic!(pf, UNSUPPORTED_LENGTH_MODIFIER);
                             return false;
                         }
                         if !T::First::IS_POINTER {
-                            compile_time_panic!(pf, PRINTF_SPECIFIER_MISMATCH);
+                            if_then_panic!(pf, PRINTF_SPECIFIER_MISMATCH);
                             return false;
                         }
                     },
@@ -661,12 +666,12 @@ const fn does_fmt_match_args_list<T: PrintfArgsList>(fmt: &[c_char], start_idx: 
                 // and argument list.
                 does_fmt_match_args_list::<T::Rest>(fmt, after_conv, panic_on_false)
             } else {
-                compile_time_panic!(pf, UNRECOGNIZED_CONVERSION_SPECIFICATION);
+                if_then_panic!(pf, UNRECOGNIZED_CONVERSION_SPECIFICATION);
                 false
             }
         },
         _ => {
-            compile_time_panic!(pf, WRONG_NUMBER_OF_CONVERSIONS);
+            if_then_panic!(pf, WRONG_NUMBER_OF_CONVERSIONS);
             false
         },
     }
