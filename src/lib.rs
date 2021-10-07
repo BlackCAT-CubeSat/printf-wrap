@@ -75,7 +75,7 @@ pub struct NullString {
 }
 
 impl NullString {
-    /// Creates a [`NullString`] from a `s`, a static `&str`,
+    /// Creates a [`NullString`] from a `s`, a static [`&str`](str),
     /// or panics if `s` is not null-terminated.
     #[allow(unconditional_panic)]
     #[deny(const_err)]
@@ -128,7 +128,14 @@ pub trait PrintfArgument: PrintfArgumentPrivate + Copy {
     /// Converts `self` to a value suitable for sending to printf(3).
     fn as_c_val(self) -> Self::CPrintfType;
 
+    /// The number of stars (`*` characters)
+    /// in the corresponding printf(3) conversion
+    /// specification to match what is put on the stack by
+    /// [`CPrintfType`](Self::CPrintfType).
     const NUM_STARS_USED: usize = 0;
+
+    /// Whether the precision of the printf(3) conversion specification
+    /// corresponding to `self` must be star (`*`).
     const NEEDS_STAR_PRECISION: bool = false;
 
     /// Whether the type is consistent with C's `char`.
@@ -305,7 +312,7 @@ impl PrintfArgument for &std::ffi::CString {
 #[cfg(feature = "std")]
 impl PrimitivePrintfArgument for &std::ffi::CString { }
 
-/// Representation of the arguments corresponding a printf(3) `%.*s`
+/// Representation of the arguments corresponding to a printf(3) `%.*s`
 /// conversion.
 #[repr(C)]
 pub struct StrSlice {
@@ -360,13 +367,13 @@ impl<T: Sized> PrimitivePrintfArgument for *mut T { }
 
 #[cfg(not(target_arch = "x86_64"))]
 #[repr(C)]
-pub struct IntArg {
+struct IntArg {
   n: c_int,
 }
 
 #[cfg(target_arch = "x86_64")]
 #[repr(C)]
-pub union IntArg {
+union IntArg {
     n: c_int,
     _ll: u64,
 }
@@ -398,6 +405,7 @@ impl<T: PrimitivePrintfArgument> PrintfArgument for (c_int, T) {
 
 /// A list of Rust-side arguments to a printf(3)-style function.
 pub trait PrintfArgs {
+    /// The [`PrintfArgsList`] equivalent to `Self`.
     type AsList: PrintfArgsList;
 }
 
