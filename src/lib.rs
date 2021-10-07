@@ -162,7 +162,8 @@ pub trait PrintfArgument: PrintfArgumentPrivate + Copy {
 pub trait PrimitivePrintfArgument: PrintfArgument { }
 
 impl_empty_trait!(PrintfArgumentPrivate;
-    u8, u16, u32, u64, usize, i8, i16, i32, i64, isize, f32, f64
+    u8, u16, u32, u64, usize, i8, i16, i32, i64, isize, f32, f64,
+    &str, NullString
 );
 
 /// Are types `T` and `U` ABI-compatible, in the sense that using
@@ -252,8 +253,18 @@ impl PrintfArgument for f64 {
     fn as_c_val(self) -> c_double { self as c_double }
 }
 
+impl PrintfArgument for NullString {
+    type CPrintfType = *const c_char;
+
+    const IS_C_STRING: bool = true;
+
+    #[inline]
+    fn as_c_val(self) -> *const c_char { self.as_ptr() }
+}
+
 impl_empty_trait!(PrimitivePrintfArgument;
-    u8, u16, u32, u64, usize, i8, i16, i32, i64, isize, f32, f64
+    u8, u16, u32, u64, usize, i8, i16, i32, i64, isize, f32, f64,
+    NullString
 );
 
 /// Representation of the arguments corresponding a printf(3) `%.*s`
@@ -270,8 +281,6 @@ pub struct StrSlice {
 // out as a function argument in the same manner as the corresponding
 // disaggregated values (treated as multiple arguments)),
 // so &str isn't also `PrimitivePrintArgument`.
-impl PrintfArgumentPrivate for &str { }
-
 impl PrintfArgument for &str {
     const NUM_STARS_USED: usize = 1;
     const NEEDS_STAR_PRECISION: bool = true;
