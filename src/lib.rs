@@ -312,7 +312,7 @@ const EMPTY_C_STRING: *const c_char = &c(b'\0') as *const c_char;
 
 impl<T: PrintfArgs> PrintfFmt<T> {
     #[allow(unconditional_panic)]
-    const fn from_str(fmt: &'static str) -> Self {
+    pub const fn from_str(fmt: &'static str) -> Self {
         if !is_compat::<u8, c_char>() {
             let p = &PANIC[U8_IS_NOT_CHAR_SIZED] as *const u8 as *const c_char;
             return PrintfFmt {
@@ -327,7 +327,7 @@ impl<T: PrintfArgs> PrintfFmt<T> {
             // same layout as pointers to T
             core::mem::transmute(fmt.as_bytes() as *const [u8] as *const [c_char])
         };
-        let s = if is_fmt_valid::<T>(fmt_as_cstr, true) { fmt_as_cstr.as_ptr() }
+        let s = if is_fmt_valid_for_args::<T>(fmt_as_cstr, true) { fmt_as_cstr.as_ptr() }
         else { EMPTY_C_STRING };
 
         PrintfFmt {
@@ -341,10 +341,18 @@ impl<T: PrintfArgs> PrintfFmt<T> {
 /// Returns whether `fmt` is (1) a valid C-style string and (2) a format
 /// string compatible with the tuple of arguments `T` when used in a
 /// printf(3)-like function.
+#[deny(unconditional_panic)]
+const fn is_fmt_valid<T: PrintfArgs>(fmt: &[c_char]) -> bool {
+    is_fmt_valid_for_args::<T>(fmt, false)
+}
+
+/// Returns whether `fmt` is (1) a valid C-style string and (2) a format
+/// string compatible with the tuple of arguments `T` when used in a
+/// printf(3)-like function.
 ///
 /// If `panic_on_false` is true, panics instead of returning `false`.
 #[allow(unconditional_panic)]
-pub const fn is_fmt_valid<T: PrintfArgs>(fmt: &[c_char], panic_on_false: bool) -> bool {
+const fn is_fmt_valid_for_args<T: PrintfArgs>(fmt: &[c_char], panic_on_false: bool) -> bool {
     let pf = panic_on_false;
 
     if !is_null_terminated(fmt) {
