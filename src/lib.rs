@@ -431,6 +431,14 @@ impl<CAR: PrintfArgument, CDR: PrintfArgsList> PrintfArgsList for (CAR, CDR) {
     type Rest = CDR;
 }
 
+impl<T: PrimitivePrintfArgument> PrintfArgs for T {
+    type AsList = (T, ());
+}
+
+impl PrintfArgs for &str {
+    type AsList = (Self, ());
+}
+
 impl PrintfArgs for () {
     type AsList = ();
 }
@@ -506,7 +514,7 @@ impl<T: PrintfArgs> PrintfFmt<T> {
     /// when given Rust-side arguments `T`, returns a [`PrintfFmt`];
     /// panics otherwise.
     #[allow(unconditional_panic)]
-    pub const fn from_str(fmt: &'static str) -> Self {
+    pub const fn new(fmt: &'static str) -> Self {
         if !is_compat::<u8, c_char>() {
             let p = &PANIC[U8_IS_NOT_CHAR_SIZED] as *const u8 as *const c_char;
             return PrintfFmt {
