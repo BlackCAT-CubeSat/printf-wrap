@@ -42,15 +42,16 @@ use libc::{c_char, c_int, c_uint, c_double};
 
 use crate::private::PrintfArgumentPrivate;
 
-
 /// Traits used to implement private details of [sealed traits].
 ///
 /// [sealed traits]: https://rust-lang.github.io/api-guidelines/future-proofing.html
 mod private {
-    ///
+    /// Marker trait for [`PrintfArgument`](`super::PrintfArgument`).
     pub trait PrintfArgumentPrivate {
     }
 }
+
+mod larger_of;
 
 macro_rules! impl_empty_trait {
     ($trait_name:ident ; $($implementor:ty),*) => {
@@ -60,7 +61,6 @@ macro_rules! impl_empty_trait {
     };
 }
 
-mod larger_of;
 
 /// A Rust-side argument to a safe wrapper around a printf(3)-like function.
 ///
@@ -111,7 +111,9 @@ pub trait PrintfArgument: PrintfArgumentPrivate + Copy {
 }
 
 /// Marker trait for implementors of [`PrintfArgument`] that are not
-/// tuples (which are used with conversion specifications involving stars).
+/// tuples (which are used with conversion specifications involving stars)
+/// _and_ whose [`CPrintfType`](PrintfArgument::CPrintfType) is not
+/// compound.
 pub trait PrimitivePrintfArgument: PrintfArgument { }
 
 impl_empty_trait!(PrintfArgumentPrivate;
@@ -140,6 +142,8 @@ pub trait LargerOfOp<Rhs> {
     type Output;
 }
 
+/// Type alias that better conveys [`LargerOfOp`]'s nature as a type-level
+/// function.
 pub type LargerOf<T, U> = <T as LargerOfOp<U>>::Output;
 
 macro_rules! impl_printf_arg_integer {
@@ -207,6 +211,8 @@ impl_empty_trait!(PrimitivePrintfArgument;
     u8, u16, u32, u64, usize, i8, i16, i32, i64, isize, f32, f64
 );
 
+/// Representation of the arguments corresponding a printf(3) `%.*s`
+/// conversion.
 #[repr(C)]
 pub struct StrSlice {
     sz: usize,
@@ -273,6 +279,8 @@ pub union IntArg {
     _ll: u64,
 }
 
+/// A structure for two C-side arguments to a printf(3)-style function;
+/// used as [`CPrintfType`](PrintfArgument::CPrintfType)s by pairs.
 #[repr(C)]
 pub struct StarredArgument<T> {
     star_arg: IntArg,
@@ -296,10 +304,12 @@ impl<T: PrimitivePrintfArgument> PrintfArgument for (c_int, T) {
     }
 }
 
+/// A list of Rust-side arguments to a printf(3)-style function.
 pub trait PrintfArgs {
     type AsList: PrintfArgsList;
 }
 
+/// A [`PrintfArgs`] in a form more amenable to recursive processing.
 pub trait PrintfArgsList {
     const IS_EMPTY: bool;
 
@@ -385,9 +395,13 @@ macro_rules! compile_time_panic {
     };
 }
 
+/// The empty C string.
 const EMPTY_C_STRING: *const c_char = &c(b'\0') as *const c_char;
 
 impl<T: PrintfArgs> PrintfFmt<T> {
+    /// If `fmt` represents a valid, supported format string for printf(3)
+    /// when given Rust-side arguments `T`, returns a [`PrintfFmt`];
+    /// panics otherwise.
     #[allow(unconditional_panic)]
     pub const fn from_str(fmt: &'static str) -> Self {
         if !is_compat::<u8, c_char>() {
@@ -417,6 +431,7 @@ impl<T: PrintfArgs> PrintfFmt<T> {
         }
     }
 
+    /// Returns a pointer to the beginning of the format string.
     pub fn as_ptr(self) -> *const c_char {
         self.fmt
     }
@@ -495,6 +510,11 @@ enum ConvSpecifier {
     Pointer,
 }
 
+/// Is `fmt`, treated as a printf(3) format string, compatible with the
+/// arguments list `T`?
+///
+/// If it is not and `panic_on_false` is true, panics instead of returning
+/// `false`.
 #[allow(unconditional_panic)]
 const fn does_fmt_match_args_list<T: PrintfArgsList>(fmt: &[c_char], start_idx: usize, panic_on_false: bool) -> bool {
     use LengthModifier as LM;
