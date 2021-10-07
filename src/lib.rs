@@ -36,6 +36,10 @@ struct CompatibleSystem { }
 // We use `libc` for types.
 extern crate libc;
 
+// We optionally provide support for a couple of relevant types in `std`.
+#[cfg(feature = "std")]
+extern crate std;
+
 use core::marker::PhantomData;
 use core::ffi::c_void;
 use libc::{c_char, c_int, c_uint, c_double};
@@ -268,6 +272,38 @@ impl_empty_trait!(PrimitivePrintfArgument;
     u8, u16, u32, u64, usize, i8, i16, i32, i64, isize, f32, f64,
     NullString
 );
+
+#[cfg(feature = "std")]
+impl PrintfArgumentPrivate for &std::ffi::CStr { }
+
+#[cfg(feature = "std")]
+impl PrintfArgument for &std::ffi::CStr {
+    type CPrintfType = *const c_char;
+
+    const IS_C_STRING: bool = true;
+
+    #[inline]
+    fn as_c_val(self) -> *const c_char { self.as_ptr() }
+}
+
+#[cfg(feature = "std")]
+impl PrimitivePrintfArgument for &std::ffi::CStr { }
+
+#[cfg(feature = "std")]
+impl PrintfArgumentPrivate for &std::ffi::CString { }
+
+#[cfg(feature = "std")]
+impl PrintfArgument for &std::ffi::CString {
+    type CPrintfType = *const c_char;
+
+    const IS_C_STRING: bool = true;
+
+    #[inline]
+    fn as_c_val(self) -> *const c_char { self.as_ptr() }
+}
+
+#[cfg(feature = "std")]
+impl PrimitivePrintfArgument for &std::ffi::CString { }
 
 /// Representation of the arguments corresponding a printf(3) `%.*s`
 /// conversion.
