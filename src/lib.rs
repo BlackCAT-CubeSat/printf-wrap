@@ -116,9 +116,6 @@ pub trait PrimitivePrintfArgument: PrintfArgument { }
 impl_empty_trait!(PrintfArgumentPrivate;
     u8, u16, u32, u64, usize, i8, i16, i32, i64, isize, f32, f64
 );
-impl_empty_trait!(PrimitivePrintfArgument;
-    u8, u16, u32, u64, usize, i8, i16, i32, i64, isize //, f32, f64
-);
 
 /// Are types `T` and `U` ABI-compatible, in the sense that using
 /// one in the place of the other wouldn't affect structure layout,
@@ -187,6 +184,28 @@ impl_printf_arg_integer! {
     isize, true,  c_int
 }
 
+impl PrintfArgument for f32 {
+    const IS_FLOAT: bool = true;
+
+    type CPrintfType = c_double;
+
+    #[inline]
+    fn as_c_val(self) -> c_double { self as c_double }
+}
+
+impl PrintfArgument for f64 {
+    const IS_FLOAT: bool = true;
+
+    type CPrintfType = c_double;
+
+    #[inline]
+    fn as_c_val(self) -> c_double { self as c_double }
+}
+
+impl_empty_trait!(PrimitivePrintfArgument;
+    u8, u16, u32, u64, usize, i8, i16, i32, i64, isize, f32, f64
+);
+
 #[repr(C)]
 pub struct StrSlice {
     sz: usize,
@@ -217,6 +236,28 @@ impl PrintfArgument for &str {
         }
     }
 }
+
+impl<T: Sized> PrintfArgumentPrivate for *const T { }
+impl<T: Sized> PrintfArgument for *const T {
+    type CPrintfType = *const c_void;
+
+    const IS_POINTER: bool = true;
+
+    #[inline]
+    fn as_c_val(self) -> *const c_void { self as *const c_void }
+}
+impl<T: Sized> PrimitivePrintfArgument for *const T { }
+
+impl<T: Sized> PrintfArgumentPrivate for *mut T { }
+impl<T: Sized> PrintfArgument for *mut T {
+    type CPrintfType = *const c_void;
+
+    const IS_POINTER: bool = true;
+
+    #[inline]
+    fn as_c_val(self) -> *const c_void { self as *mut c_void as *const c_void }
+}
+impl<T: Sized> PrimitivePrintfArgument for *mut T { }
 
 #[cfg(not(target_arch = "x86_64"))]
 #[repr(C)]
