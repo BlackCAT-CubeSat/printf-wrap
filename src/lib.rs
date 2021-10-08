@@ -282,7 +282,6 @@ make_printf_arguments_tuple!( T, U, V, W, X, Y, Z, A );
 /// A type-safe wrapper around a C-style string verified to be compatible
 /// with use as a format string for printf(3)-style functions called with
 /// `T` as the varargs.
-#[derive(Clone, Copy)]
 pub struct PrintfFmt<T: PrintfArgs> {
     fmt: *const c_char,
     _x: CompatibleSystem,
@@ -367,6 +366,14 @@ impl<T: PrintfArgs> PrintfFmt<T> {
         self.fmt
     }
 }
+
+impl<T: PrintfArgs> Clone for PrintfFmt<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<T: PrintfArgs> Copy for PrintfFmt<T> { }
 
 /// Returns whether `fmt` is (1) a valid C-style string and (2) a format
 /// string compatible with the tuple of arguments `T` when used in a
