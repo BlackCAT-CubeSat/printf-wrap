@@ -224,6 +224,21 @@ impl<T: PrimitivePrintfArgument> PrintfArgument for (c_int, T) {
     const NUM_STARS_USED: usize = T::NUM_STARS_USED + 1;
     const NEEDS_STAR_PRECISION: bool = T::NEEDS_STAR_PRECISION;
 
+    const IS_CHAR: bool      = T::IS_CHAR;
+    const IS_SHORT: bool     = T::IS_SHORT;
+    const IS_INT: bool       = T::IS_INT;
+    const IS_LONG: bool      = T::IS_LONG;
+    const IS_LONG_LONG: bool = T::IS_LONG_LONG;
+
+    const IS_SIZE: bool      = T::IS_SIZE;
+    const IS_MAX: bool       = T::IS_MAX;
+    const IS_PTRDIFF: bool   = T::IS_PTRDIFF;
+
+    const IS_SIGNED: bool    = T::IS_SIGNED;
+    const IS_FLOAT: bool     = T::IS_FLOAT;
+    const IS_C_STRING: bool  = T::IS_C_STRING;
+    const IS_POINTER: bool   = T::IS_POINTER;
+
     type CPrintfType = StarredArgument<T::CPrintfType>;
 
     #[inline]
