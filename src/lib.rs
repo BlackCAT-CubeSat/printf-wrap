@@ -372,4 +372,25 @@ pub mod example {
     tuple_impl!(6, printf6, snprintf6, (A, B, C, D, E, F), (a, b, c, d, e, f));
     tuple_impl!(7, printf7, snprintf7, (A, B, C, D, E, F, G), (a, b, c, d, e, f, g));
     tuple_impl!(8, printf8, snprintf8, (A, B, C, D, E, F, G, H), (a, b, c, d, e, f, g, h));
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use crate::PrintfFmt;
+
+        #[test]
+        fn snprintf_test_invocation() {
+            let mut x: [u8; 12] = [5u8; 12];
+
+            assert_eq!(snprintf2(&mut x[..], PrintfFmt::new("X %u Y %c\0"), 15u32, b'Z'), 8, "snprintf2 return value should be 8");
+            assert_eq!(&x, b"X 15 Y Z\0\x05\x05\x05", "contents of x");
+        }
+
+        #[test]
+        fn snprintf_no_buffer_overflow() {
+            let mut x: [u8; 8] = [5u8; 8];
+            assert_eq!(snprintf1(&mut x[..4], PrintfFmt::new("a%d \0"), -100), 6, "snprintf1 return value should be 6");
+            assert_eq!(&x[4..], b"\x05\x05\x05\x05", "only 4 bytes should have been written by snprintf1");
+        }
+    }
 }
