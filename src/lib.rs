@@ -1,10 +1,30 @@
 // Copyright (c) 2021 The Pennsylvania State University. All rights reserved.
 
-//! Types and whatnot for safe use of printf(3)-style format strings.
-
-// https://pubs.opengroup.org/onlinepubs/9699919799/functions/printf.html
-// https://man7.org/linux/man-pages/man3/printf.3.html
-// https://www.freebsd.org/cgi/man.cgi?printf%283%29
+//! Types and functions for safe use of printf(3)-style format strings.
+//!
+//! `printf(3)` ([POSIX], [Linux], and [FreeBSD] man pages) and its variants
+//! present some challenges for memory-safe use from Rust:
+//! the passed-in arguments
+//! are interpreted as different types based on the content of the format
+//! string, with each conversion specification (e.g., `%s`) consuming up to
+//! three arguments (e.g, `%*.*d`), and the `%n` specification even writing
+//! to memory!
+//! For memory- and type-safe use, we must make sure a given format string
+//! is only used in invocations with the correct argument number and type.
+//!
+//! This crate contains mechanisms you can use to ensure such agreement.
+//! [`PrintfFmt`]`<(A, B, ...)>` wraps a format string, doing verification to ensure
+//! it can be safely used with the list of arguments corresponding to
+//! the tuple of types
+//! `(A: `[`PrintfArgument`]`, B: `[`PrintfArgument`]`, ...)`.
+//! This verification may be performed at
+//! compile time, allowing for safe wrappers with zero runtime overhead.
+//! An example of how to do so, using `printf(3)` and `snprintf(3)` as the
+//! functions to wrap, can be found in the [`example`] module.
+//!
+//! [POSIX]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/printf.html
+//! [Linux]: https://man7.org/linux/man-pages/man3/printf.3.html
+//! [FreeBSD]: https://www.freebsd.org/cgi/man.cgi?printf%283%29
 
 #![no_std]
 
