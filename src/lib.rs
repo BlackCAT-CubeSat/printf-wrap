@@ -449,3 +449,6 @@ pub mod example {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;
