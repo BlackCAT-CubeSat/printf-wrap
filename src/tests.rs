@@ -4,7 +4,7 @@
 
 #![cfg(test)]
 
-use libc::{c_char, c_int, c_ulonglong};
+use libc::{c_char, c_uchar, c_ushort, c_int, c_uint, c_long, c_ulonglong};
 use crate::NullString;
 
 macro_rules! generate_construction_panic_case {
@@ -54,20 +54,36 @@ macro_rules! generate_successful_case {
 }
 
 generate_successful_case! {
-    no_conversions,        " test format string ",  ();
-    percent_escape,        "test of %% - %%",       ();
-    one_int,               "there are %d lights",   (c_int);
-    int_with_width,        "%5d bananas",           (c_int);
+    no_conversions,        " test format string ", ();
+    percent_escape,        "test of %% - %%",      ();
+    one_int,               "there are %d lights",  (c_int);
+    int_with_width,        "%5d bananas",          (c_int);
 
-    int_with_flags,        "% 05ddays",             (c_int);
-    int_with_precision,    "%.6d",                  (c_int);
-    int_width_precision,   "%14.2d",                (c_int);
-    int_starred_width,     "%*d",                   ((c_int, c_int));
+    int_with_flags,        "% 03ddays",            (c_int);
+    int_with_precision,    "%.6d",                 (c_int);
+    int_width_precision,   "%14.2d",               (c_int);
+    int_starred_width,     "%*d",                  ((c_int, c_int));
 
-    int_starred_precision, "%5.*d",                 ((c_int, c_int));
-    null_string_basic,     "The %s Show",           (NullString);
-    nullstr_star_prec,     "[<=n chars: %.*s]",     ((c_int, NullString));
+    int_starred_precision, "%5.*d",                ((c_int, c_int));
+    null_string_basic,     "The %s Show",          (NullString);
+    nullstr_star_prec,     "[<=n chars: %.*s]",    ((c_int, NullString));
     str_usage,             "Need * precision: %.*s", (&str);
 
-    two_conversions,       "%d * %c",               (c_int, c_char);
+    two_conversions,       "%d * %c",              (c_int, c_uchar);
+    two_conv_and_one_star, "%x * %.*s",            (c_uint, (c_int, NullString));
+    conv_with_percent,     "Progress: %d%%",       (c_uint);
+    octal_conv,            "mode: %04o\n",         (c_uint);
+
+    char_int_conv,         "%hhu",                 (c_char);
+    short_int_conv,        "%hx",                  (c_ushort);
+    long_conv,             "%ld",                  (c_long);
+    long_long_conv,        "%llX",                 (c_ulonglong);
+
+    length_with_star,      "%*llu",                ((c_int, c_ulonglong));
+    str_with_padding,      "%10.*s",               (&str);
+    pointer_conv,          "at address %p",        (*const u32);
+    f32_conv,              "cost: %5.2g",          (f32);
+    f64_conv,              "cost: %5.2f",          (f64);
+
+    complex_conversion,    "(%08.*x, %F, %%, %s)", ((c_int, c_uint), f64, NullString);
 }
