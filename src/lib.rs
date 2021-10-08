@@ -22,6 +22,17 @@
 //! An example of how to do so, using `printf(3)` and `snprintf(3)` as the
 //! functions to wrap, can be found in the [`example`] module.
 //!
+//! Only a subset of all possible `printf` format strings are accepted:
+//!
+//! * Numbered argument conversion specifications (e.g., `%2$d`) are not
+//!   supported.
+//! * At most one of the field width and precision may be `*`.
+//! * `%lc`, `%ls`, `%C`, `%S`, and `%L[fFeEgGaA]` are not supported.
+//! * `%n` is not supported.
+//!
+//! As of now, due to implementation details, this crate is only known
+//! to work on i386, x86-64, and 32-bit ARM systems using the ELF ABI.
+//!
 //! [POSIX]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/printf.html
 //! [Linux]: https://man7.org/linux/man-pages/man3/printf.3.html
 //! [FreeBSD]: https://www.freebsd.org/cgi/man.cgi?printf%283%29
@@ -336,7 +347,7 @@ impl<T: PrintfArgs> PrintfFmt<T> {
     }
 
     /// If `fmt` represents a valid, supported format string for printf(3)
-    /// when given Rust-side arguments `T`, returns it as a [`PrintfFmt`];
+    /// when given Rust-side arguments `T`, returns it as `Ok(`[`PrintfFmt`]`)`;
     /// returns `Err(())` otherwise.
     pub const fn new(fmt: &'static str) -> Result<Self, ()> {
         if !is_compat::<u8, c_char>() {

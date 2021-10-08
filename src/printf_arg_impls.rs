@@ -186,6 +186,11 @@ impl PrintfArgument for &str {
     }
 }
 
+// IntArg is a hack needed to make sure the layout of StarredArgument,
+// when used as a function argument, is the same as the layout of
+// StarredArgument's star_arg and arg fields if they were used
+// as two sequential function arguments.
+
 #[cfg(not(target_arch = "x86_64"))]
 #[repr(C)]
 struct IntArg {
@@ -201,6 +206,12 @@ union IntArg {
 
 /// A structure for two C-side arguments to a printf(3)-style function;
 /// used as [`CPrintfType`](PrintfArgument::CPrintfType)s by pairs.
+///
+/// It must be two machine words in size or less in order for the
+/// structure representation (in registers and/or memory)
+/// as a function argument to _always_ be the same
+/// as passing `star_arg` and `arg` as two separate-but-adjacent
+/// function arguments on x86-64.
 #[repr(C)]
 pub struct StarredArgument<T> {
     star_arg: IntArg,
