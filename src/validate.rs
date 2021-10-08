@@ -12,14 +12,14 @@ use crate::{PrintfArgument, PrintfArgs, PrintfArgsList, c};
 const PANIC: [u8; 0] = [];
 
 // "Indices" to use with PANIC
-const NOT_NULL_TERMINATED: usize = 42;
-const WRONG_NUMBER_OF_STARS_IN_SPECIFICATION: usize = 44;
-const PRECISION_MUST_BE_STAR: usize = 45;
-const INTEGER_WIDTH_MISMATCH_IN_SPECIFICATION: usize = 46;
-const UNSUPPORTED_LENGTH_MODIFIER: usize = 47;
-const PRINTF_SPECIFIER_MISMATCH: usize = 48;
-const UNRECOGNIZED_CONVERSION_SPECIFICATION: usize = 49;
-const WRONG_NUMBER_OF_CONVERSIONS: usize = 50;
+const NOT_NULL_TERMINATED: usize = 10042;
+const WRONG_NUMBER_OF_STARS_IN_SPECIFICATION: usize = 10044;
+const PRECISION_MUST_BE_STAR: usize = 10045;
+const INTEGER_WIDTH_MISMATCH_IN_SPECIFICATION: usize = 10046;
+const UNSUPPORTED_LENGTH_MODIFIER: usize = 10047;
+const PRINTF_SPECIFIER_MISMATCH: usize = 10048;
+const UNRECOGNIZED_CONVERSION_SPECIFICATION: usize = 10049;
+const WRONG_NUMBER_OF_CONVERSIONS: usize = 10050;
 
 /// If `$cond` is true, panic using `$reason` (used as an invalid array index).
 ///

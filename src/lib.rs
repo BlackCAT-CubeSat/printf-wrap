@@ -312,7 +312,7 @@ impl<T: PrintfArgs> PrintfFmt<T> {
     #[allow(unconditional_panic)]
     pub const fn new_or_panic(fmt: &'static str) -> Self {
         const PANIC: [c_char; 0] = [];
-        const U8_IS_NOT_CHAR_SIZED: usize = 42;
+        const U8_IS_NOT_CHAR_SIZED: usize = 10043;
 
         if !is_compat::<u8, c_char>() {
             // We do out-of-bounds indexing, as we can't currently use
