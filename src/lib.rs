@@ -300,7 +300,7 @@ impl<T: PrintfArgs> PrintfFmt<T> {
     /// when given Rust-side arguments `T`, returns a [`PrintfFmt`];
     /// panics otherwise.
     #[allow(unconditional_panic)]
-    pub const fn new(fmt: &'static str) -> Self {
+    pub const fn new_or_panic(fmt: &'static str) -> Self {
         const PANIC: [c_char; 0] = [];
         const U8_IS_NOT_CHAR_SIZED: usize = 42;
 
@@ -315,12 +315,14 @@ impl<T: PrintfArgs> PrintfFmt<T> {
                 _y: PhantomData,
             };
         }
+
         let fmt_as_cstr: &'static [c_char] = unsafe {
             // Following is safe, as (1) we've verified u8 has the same
             // size and alignment as c_char and (2) references to T have the
             // same layout as pointers to T
             core::mem::transmute(fmt.as_bytes() as *const [u8] as *const [c_char])
         };
+
         let s = if is_fmt_valid_for_args::<T>(fmt_as_cstr, true) {
             fmt_as_cstr.as_ptr()
         } else {
@@ -331,6 +333,32 @@ impl<T: PrintfArgs> PrintfFmt<T> {
             fmt: s,
             _x: CompatibleSystem { },
             _y: PhantomData,
+        }
+    }
+
+    /// If `fmt` represents a valid, supported format string for printf(3)
+    /// when given Rust-side arguments `T`, returns it as a [`PrintfFmt`];
+    /// returns `Err(())` otherwise.
+    pub const fn new(fmt: &'static str) -> Result<Self, ()> {
+        if !is_compat::<u8, c_char>() {
+            return Err(());
+        }
+
+        let fmt_as_cstr: &'static [c_char] = unsafe {
+            // Following is safe, as (1) we've verified u8 has the same
+            // size and alignment as c_char and (2) references to T have the
+            // same layout as pointers to T
+            core::mem::transmute(fmt.as_bytes() as *const [u8] as *const [c_char])
+        };
+
+        if is_fmt_valid_for_args::<T>(fmt_as_cstr, false) {
+            Ok(PrintfFmt {
+                fmt: fmt_as_cstr.as_ptr(),
+                _x: CompatibleSystem { },
+                _y: PhantomData,
+            })
+        } else {
+            Err(())
         }
     }
 
@@ -402,14 +430,14 @@ pub mod example {
         fn snprintf_test_invocation() {
             let mut x: [u8; 12] = [5u8; 12];
 
-            assert_eq!(snprintf2(&mut x[..], PrintfFmt::new("X %u Y %c\0"), 15u32, b'Z'), 8, "snprintf2 return value should be 8");
+            assert_eq!(snprintf2(&mut x[..], PrintfFmt::new("X %u Y %c\0").unwrap(), 15u32, b'Z'), 8, "snprintf2 return value should be 8");
             assert_eq!(&x, b"X 15 Y Z\0\x05\x05\x05", "contents of x");
         }
 
         #[test]
         fn snprintf_no_buffer_overflow() {
             let mut x: [u8; 8] = [5u8; 8];
-            assert_eq!(snprintf1(&mut x[..4], PrintfFmt::new("a%d \0"), -100), 6, "snprintf1 return value should be 6");
+            assert_eq!(snprintf1(&mut x[..4], PrintfFmt::new("a%d \0").unwrap(), -100), 6, "snprintf1 return value should be 6");
             assert_eq!(&x[4..], b"\x05\x05\x05\x05", "only 4 bytes should have been written by snprintf1");
         }
     }
