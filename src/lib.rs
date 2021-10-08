@@ -332,15 +332,14 @@ pub const fn is_fmt_valid<T: PrintfArgs>(fmt: &[c_char]) -> bool {
 /// wrap functions with printf(3)-style format strings and varargs.
 pub mod example {
     use libc::{c_char, c_int};
-    use crate::{PrintfFmt, PrintfArgs, PrintfArgument};
+    use crate::{PrintfFmt, PrintfArgument};
 
     macro_rules! tuple_impl {
         ($num:tt, $p_name:ident, $snp_name:ident, ( $($t:ident),* ), ( $($var:ident),* )) => {
             #[doc = concat!("A safe wrapper around [`printf`](libc::printf) for ", stringify!($num), " argument(s).")]
             #[inline]
             pub fn $p_name<$($t),*>(fmt: PrintfFmt<($($t,)*)>, $($var: $t),*) -> c_int
-                where $($t: PrintfArgument ,)*
-                    ($($t,)*): PrintfArgs {
+                where $($t: PrintfArgument),* {
 
                 unsafe {
                     libc::printf(fmt.as_ptr() $(, $var.as_c_val())* )
@@ -350,8 +349,7 @@ pub mod example {
             #[doc = concat!("A safe wrapper around [`snprintf`](libc::snprintf) for ", stringify!($num), " argument(s).")]
             #[inline]
             pub fn $snp_name<$($t),*>(dst: &mut [u8], fmt: PrintfFmt<($($t,)*)>, $($var: $t),*) -> c_int
-                where $($t: PrintfArgument ,)*
-                    ($($t,)*): PrintfArgs {
+                where $($t: PrintfArgument),* {
 
                 unsafe {
                     libc::snprintf(
