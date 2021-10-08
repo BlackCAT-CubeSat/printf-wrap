@@ -310,6 +310,7 @@ impl<T: PrintfArgs> PrintfFmt<T> {
     /// when given Rust-side arguments `T`, returns a [`PrintfFmt`];
     /// panics otherwise.
     #[allow(unconditional_panic)]
+    #[inline]
     pub const fn new_or_panic(fmt: &'static str) -> Self {
         const PANIC: [c_char; 0] = [];
         const U8_IS_NOT_CHAR_SIZED: usize = 10043;
@@ -349,6 +350,7 @@ impl<T: PrintfArgs> PrintfFmt<T> {
     /// If `fmt` represents a valid, supported format string for printf(3)
     /// when given Rust-side arguments `T`, returns it as `Ok(`[`PrintfFmt`]`)`;
     /// returns `Err(())` otherwise.
+    #[inline]
     pub const fn new(fmt: &'static str) -> Result<Self, ()> {
         if !is_compat::<u8, c_char>() {
             return Err(());
@@ -373,7 +375,8 @@ impl<T: PrintfArgs> PrintfFmt<T> {
     }
 
     /// Returns a pointer to the beginning of the format string.
-    pub fn as_ptr(self) -> *const c_char {
+    #[inline]
+    pub const fn as_ptr(self) -> *const c_char {
         self.fmt
     }
 }
@@ -390,6 +393,7 @@ impl<T: PrintfArgs> Copy for PrintfFmt<T> { }
 /// string compatible with the tuple of arguments `T` when used in a
 /// printf(3)-like function.
 #[deny(unconditional_panic)]
+#[inline]
 pub const fn is_fmt_valid<T: PrintfArgs>(fmt: &[c_char]) -> bool {
     is_fmt_valid_for_args::<T>(fmt, false)
 }
