@@ -460,7 +460,7 @@ pub mod example {
         fn snprintf_no_buffer_overflow() {
             let mut x: [u8; 8] = [5u8; 8];
             assert_eq!(snprintf1(&mut x[..4], PrintfFmt::new("a%d \0").unwrap(), -100), 6, "snprintf1 return value should be 6");
-            assert_eq!(&x[4..], b"\x05\x05\x05\x05", "only 4 bytes should have been written by snprintf1");
+            assert_eq!(&x[4..], [5u8; 4], "only 4 bytes should have been written by snprintf1");
         }
     }
 }
