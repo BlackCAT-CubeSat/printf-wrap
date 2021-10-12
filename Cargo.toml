@@ -1,5 +1,6 @@
 [package]
-name = "xyzzy"
+name = "printf-wrap"
+description = "Types and functions for safely wrapping functions with printf(3)-style format strings and varargs"
 version = "0.1.0"
 edition = "2018"
 
