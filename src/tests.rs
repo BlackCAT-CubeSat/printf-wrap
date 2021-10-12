@@ -31,10 +31,7 @@ generate_construction_panic_case! {
     wrong_order,            " %s %d ",     (c_int, NullString);
     improper_percent,       " %% %d ",     (c_char, c_int);
 
-    no_needed_star,         " %llx ",      ((c_int, c_ulonglong));
-    too_many_stars_str,     " %*.*s ",     (&str);
-    not_enough_stars_str,   " %s ",        (&str);
-    no_precision_str,       " %*s ",       (&str);
+    wrong_type,             " %llx ",      (c_char);
 }
 
 macro_rules! generate_successful_case {
@@ -62,15 +59,14 @@ generate_successful_case! {
     int_with_flags,        "% 03ddays",            (c_int);
     int_with_precision,    "%.6d",                 (c_int);
     int_width_precision,   "%14.2d",               (c_int);
-    int_starred_width,     "%*d",                  ((c_int, c_int));
+    int_starred_width,     "%*d",                  (c_int, c_int);
 
-    int_starred_precision, "%5.*d",                ((c_int, c_int));
+    int_starred_precision, "%5.*d",                (c_int, c_int);
     null_string_basic,     "The %s Show",          (NullString);
-    nullstr_star_prec,     "[<=n chars: %.*s]",    ((c_int, NullString));
-    str_usage,             "Need * precision: %.*s", (&str);
+    nullstr_star_prec,     "[<=n chars: %.*s]",    (c_int, NullString);
 
     two_conversions,       "%d * %c",              (c_int, c_uchar);
-    two_conv_and_one_star, "%x * %.*s",            (c_uint, (c_int, NullString));
+    two_conv_and_one_star, "%x * %.*s",            (c_uint, c_int, NullString);
     conv_with_percent,     "Progress: %d%%",       (c_uint);
     octal_conv,            "mode: %04o\n",         (c_uint);
 
@@ -79,13 +75,13 @@ generate_successful_case! {
     long_conv,             "%ld",                  (c_long);
     long_long_conv,        "%llX",                 (c_ulonglong);
 
-    length_with_star,      "%*llu",                ((c_int, c_ulonglong));
-    str_with_padding,      "%10.*s",               (&str);
+    length_with_star,      "%*llu",                (c_int, c_ulonglong);
+    str_with_padding,      "%10.*s",               (c_int, NullString);
     pointer_conv,          "at address %p",        (*const u32);
     f32_conv,              "cost: %5.2g",          (f32);
     f64_conv,              "cost: %5.2f",          (f64);
 
-    complex_conversion,    "(%08.*x, %F, %%, %s)", ((c_int, c_uint), f64, NullString);
+    complex_conversion,    "(%08.*x, %F, %%, %s)", (c_int, c_uint, f64, NullString);
 }
 
 /// Tests checking that we are indeed passing arguments the right way
@@ -146,60 +142,59 @@ mod abi_check {
             8, b"1A2B3\0\t\t";
         args_f, snprintf1, "A%.1f ", (2.0f64):
             8, b"A2.0 \0\t\t";
+        args_sf, snprintf2, ":%s:%.0f:", (null_str!("string."), 2.0f64):
+            14, b":string.:2:\0\t\t";
 
-        // These are the *really* important tests in this set:
-        // making sure our uses of structs in a couple of places play well
-        // with the calling convention...
-
-        args_Xd, snprintf1, "%*d", ((6 as c_int, -4 as c_int)):
+        args_Xd, snprintf2, "%*d", (6 as c_int, -4 as c_int):
             8, b"    -4\0\t";
-        args_Xf, snprintf1, "X%.*fX", ((3 as c_int, 2.0f64)):
+        args_Xf, snprintf2, "X%.*fX", (3 as c_int, 2.0f64):
             9, b"X2.000X\0\t";
-        args_Xs, snprintf1, " :%.*s: ", ("hello!"):
+        args_Xs, snprintf2, " :%.*s: ", (6 as c_int, null_str!("hello!")):
             13, b" :hello!: \0\t\t";
-        args_XfXf, snprintf2, ":%.*f:%.*f:",
-            ((4 as c_int, 2.0f64), (2 as c_int, 2.5f64)):
+        args_XfXf, snprintf4, ":%.*f:%.*f:",
+            (4 as c_int, 2.0f64, 2 as c_int, 2.5f64):
             17, b":2.0000:2.50:\0\t\t\t";
-        args_ddXd, snprintf3, ":%d:%u:%*d:",
-            (1 as c_int, 2 as c_uint, (6 as c_int, 3 as c_int)):
+        args_ddXd, snprintf4, ":%d:%u:%*d:",
+            (1 as c_int, 2 as c_uint, 6 as c_int, 3 as c_int):
             16, b":1:2:     3:\0\t\t\t";
-        args_ccXd, snprintf3, ":%c:%c:%*d:",
-            (b'a' as c_char, b'b' as c_char, (6 as c_int, 5 as c_uint)):
+        args_ccXd, snprintf4, ":%c:%c:%*d:",
+            (b'a' as c_char, b'b' as c_char, 6 as c_int, 5 as c_uint):
             19, b":a:b:     5:\0\t\t\t\t\t\t";
-        args_ddXf, snprintf3, ":%d:%d:%*f:",
-            (10 as c_int, -1 as c_int, (5 as c_int, 2.0f32)):
+        args_ddXf, snprintf4, ":%d:%d:%*.0f:",
+            (10 as c_int, -1 as c_int, 5 as c_int, 2.0f32):
             15, b":10:-1:    2:\0\t";
-        args_ddXs, snprintf3, ":%u:%u:%.*s:",
-            (42 as c_uint, 9 as c_uint, "test"):
+        args_ddXs, snprintf4, ":%u:%u:%.*s:",
+            (42 as c_uint, 9 as c_uint, 4 as c_int, null_str!("test")):
             14, b":42:9:test:\0\t\t";
-        args_dXfd, snprintf3, ":04%o:%*f:%d:",
-            (32 as c_uint, (5 as c_int, 2.5f64), 32 as c_int):
+        args_dXfd, snprintf4, ":%04o:%*.1f:%d:",
+            (32 as c_uint, 5 as c_int, 2.5f64, 32 as c_int):
             18, b":0040:  2.5:32:\0\t\t";
-        args_dXsd, snprintf3, ":%d:%.*s:%d:", (32 as c_int, "hi!", 4 as c_int):
+        args_dXsd, snprintf4, ":%d:%.*s:%d:",
+            (32 as c_int, 3 as c_int, null_str!("hi!"), 4 as c_int):
             13, b":32:hi!:4:\0\t\t";
 
-        args_cddXdd, snprintf5, ":%c:%d:%d:%*d:%d:",
-            (b'@' as c_char, 1 as c_int, 2 as c_int, (5 as c_int, 3 as c_int), 4 as c_int):
+        args_cddXdd, snprintf6, ":%c:%d:%d:%*d:%d:",
+            (b'@' as c_char, 1 as c_int, 2 as c_int, 5 as c_int, 3 as c_int, 4 as c_int):
             18, b":@:1:2:    3:4:\0\t\t";
-        args_dddXfd, snprintf5, ":%d:%d:%d:%*f:%d:",
-            (1 as c_int, 2 as c_int, 3 as c_int, (3 as c_int, 4.0f32), 5 as c_int):
+        args_dddXfd, snprintf6, ":%d:%d:%d:%*.0f:%d:",
+            (1 as c_int, 2 as c_int, 3 as c_int, 3 as c_int, 4.0f32, 5 as c_int):
             16, b":1:2:3:  4:5:\0\t\t";
-        args_ddXfdd, snprintf5, ":%d:%d:%*f:%d:%d:",
-            (1 as c_int, 2 as c_int, (3 as c_int, 3.0f32), 4 as c_int, 5 as c_int):
+        args_ddXfdd, snprintf6, ":%d:%d:%*.0f:%d:%d:",
+            (1 as c_int, 2 as c_int, 3 as c_int, 3.0f32, 4 as c_int, 5 as c_int):
             16, b":1:2:  3:4:5:\0\t\t";
-        args_dddddXd, snprintf6, ":%d:%d:%d:%d:%d:%*d:",
-            (1 as c_int, 2 as c_int, 3 as c_int, 4 as c_int, 5 as c_int, (6 as c_int, 6 as c_int)):
+        args_dddddXd, snprintf7, ":%d:%d:%d:%d:%d:%*d:",
+            (1 as c_int, 2 as c_int, 3 as c_int, 4 as c_int, 5 as c_int, 6 as c_int, 6 as c_int):
             21, b":1:2:3:4:5:     6:\0\t\t";
-        args_dddXs, snprintf4, ":%d:%d:%d:%.*s",
-            (1 as c_int, 2 as c_int, 3 as c_int, "hi there!"):
+        args_dddXs, snprintf5, ":%d:%d:%d:%.*s:",
+            (1 as c_int, 2 as c_int, 3 as c_int, 9 as c_int, null_str!("hi there!")):
             20, b":1:2:3:hi there!:\0\t\t";
 
-        args_cddddXdd, snprintf7, ":%c:%d:%d:%d:%d:%*d:%d:",
+        args_cddddXdd, snprintf8, ":%c:%d:%d:%d:%d:%*d:%d:",
             (b'^' as c_char, 1 as c_int, 2 as c_int, 3 as c_int, 4 as c_int,
-             (5 as c_int, -40 as c_int), 6 as c_int):
+             5 as c_int, -40 as c_int, 6 as c_int):
             22, b":^:1:2:3:4:  -40:6:\0\t\t";
-        args_dddXfddd, snprintf7, ":%d:%d:%d:%*f:%d:%d:%d:",
-            (1 as c_int, 2 as c_int, 3 as c_int, (5 as c_int, -2.0f64),
+        args_dddXfddd, snprintf8, ":%d:%d:%d:%*.0f:%d:%d:%d:",
+            (1 as c_int, 2 as c_int, 3 as c_int, 5 as c_int, -2.0f64,
              7 as c_int, 8 as c_int, 9 as c_int):
             22, b":1:2:3:   -2:7:8:9:\0\t\t";
     }

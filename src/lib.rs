@@ -26,12 +26,8 @@
 //!
 //! * Numbered argument conversion specifications (e.g., `%2$d`) are not
 //!   supported.
-//! * At most one of the field width and precision may be `*`.
 //! * `%lc`, `%ls`, `%C`, `%S`, and `%L[fFeEgGaA]` are not supported.
 //! * `%n` is not supported.
-//!
-//! As of now, due to implementation details, this crate is only known
-//! to work on i386, x86-64, and 32-bit ARM systems using the ELF ABI.
 //!
 //! [POSIX]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/printf.html
 //! [Linux]: https://man7.org/linux/man-pages/man3/printf.3.html
@@ -41,26 +37,11 @@
 
 #![feature(const_fn_trait_bound)]
 
-// We engage in a little naughtiness where we rely on two arguments to
-// functions and the two elements of the following structs (when used as
-// a single argument to a function) being laid out in same way always:
-//
-// StrSlice
-// StarredArgument
-//
-// This is not guaranteed to be true in general, but is known to be true
-// for the following architectures and ABIs (using OSes as a proxy for ABI):
-#[cfg(all(
-    any(target_arch = "x86", target_arch = "x86_64", target_arch = "arm"),
-    any(target_os = "linux", target_os = "android", target_os = "freebsd",
-        target_os = "dragonfly", target_os = "openbsd", target_os = "netbsd")
-))]
-
 // We only aim for compatibility with printf(3) as specified in POSIX:
 #[cfg(unix)]
 
 /// Marker structure used to ensure this crate only sucessfully compiles for
-/// known-compatible (architecture, ABI) pairs.
+/// known-compatible systems.
 #[derive(Clone,Copy)]
 struct CompatibleSystem { }
 
@@ -76,8 +57,6 @@ use libc::c_char;
 
 use crate::validate::is_fmt_valid_for_args;
 use crate::private::PrintfArgumentPrivate;
-
-pub use crate::printf_arg_impls::{StrSlice, StarredArgument};
 
 /// Traits used to implement private details of [sealed traits].
 ///
@@ -155,16 +134,6 @@ pub trait PrintfArgument: PrintfArgumentPrivate + Copy {
     /// Converts `self` to a value suitable for sending to printf(3).
     fn as_c_val(self) -> Self::CPrintfType;
 
-    /// The number of stars (`*` characters)
-    /// in the corresponding printf(3) conversion
-    /// specification to match what is put on the stack by
-    /// [`CPrintfType`](Self::CPrintfType).
-    const NUM_STARS_USED: usize = 0;
-
-    /// Whether the precision of the printf(3) conversion specification
-    /// corresponding to `self` must be star (`*`).
-    const NEEDS_STAR_PRECISION: bool = false;
-
     /// Whether the type is consistent with C's `char`.
     const IS_CHAR: bool = false;
     /// Whether the type is consistent with C's `short int`.
@@ -194,12 +163,6 @@ pub trait PrintfArgument: PrintfArgumentPrivate + Copy {
     /// Whether the type is a pointer.
     const IS_POINTER: bool = false;
 }
-
-/// Marker trait for implementors of [`PrintfArgument`] that are not
-/// tuples (which are used with conversion specifications involving stars)
-/// _and_ whose [`CPrintfType`](PrintfArgument::CPrintfType) is not
-/// compound.
-pub trait PrimitivePrintfArgument: PrintfArgument { }
 
 /// Are types `T` and `U` ABI-compatible, in the sense that using
 /// one in the place of the other wouldn't affect structure layout,
@@ -255,12 +218,8 @@ impl<CAR: PrintfArgument, CDR: PrintfArgsList> PrintfArgsList for (CAR, CDR) {
     type Rest = CDR;
 }
 
-impl<T: PrimitivePrintfArgument> PrintfArgs for T {
+impl<T: PrintfArgument> PrintfArgs for T {
     type AsList = (T, ());
-}
-
-impl PrintfArgs for &str {
-    type AsList = (Self, ());
 }
 
 impl PrintfArgs for () {
@@ -281,14 +240,22 @@ macro_rules! make_printf_arguments_tuple {
     };
 }
 
-make_printf_arguments_tuple!( T );
-make_printf_arguments_tuple!( T, U );
-make_printf_arguments_tuple!( T, U, V );
-make_printf_arguments_tuple!( T, U, V, W );
-make_printf_arguments_tuple!( T, U, V, W, X );
-make_printf_arguments_tuple!( T, U, V, W, X, Y );
-make_printf_arguments_tuple!( T, U, V, W, X, Y, Z );
-make_printf_arguments_tuple!( T, U, V, W, X, Y, Z, A );
+make_printf_arguments_tuple!( A );
+make_printf_arguments_tuple!( A, B );
+make_printf_arguments_tuple!( A, B, C );
+make_printf_arguments_tuple!( A, B, C, D );
+make_printf_arguments_tuple!( A, B, C, D, E );
+make_printf_arguments_tuple!( A, B, C, D, E, F );
+make_printf_arguments_tuple!( A, B, C, D, E, F, G );
+make_printf_arguments_tuple!( A, B, C, D, E, F, G, H );
+make_printf_arguments_tuple!( A, B, C, D, E, F, G, H, I );
+make_printf_arguments_tuple!( A, B, C, D, E, F, G, H, I, J );
+make_printf_arguments_tuple!( A, B, C, D, E, F, G, H, I, J, K );
+make_printf_arguments_tuple!( A, B, C, D, E, F, G, H, I, J, K, L );
+make_printf_arguments_tuple!( A, B, C, D, E, F, G, H, I, J, K, L, M );
+make_printf_arguments_tuple!( A, B, C, D, E, F, G, H, I, J, K, L, M, N );
+make_printf_arguments_tuple!( A, B, C, D, E, F, G, H, I, J, K, L, M, N, O );
+make_printf_arguments_tuple!( A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P );
 
 /// A type-safe wrapper around a C-style string verified to be compatible
 /// with use as a format string for printf(3)-style functions called with

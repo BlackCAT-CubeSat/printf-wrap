@@ -13,13 +13,13 @@ const PANIC: [u8; 0] = [];
 
 // "Indices" to use with PANIC
 const NOT_NULL_TERMINATED: usize = 10042;
-const WRONG_NUMBER_OF_STARS_IN_SPECIFICATION: usize = 10044;
-const PRECISION_MUST_BE_STAR: usize = 10045;
 const INTEGER_WIDTH_MISMATCH_IN_SPECIFICATION: usize = 10046;
 const UNSUPPORTED_LENGTH_MODIFIER: usize = 10047;
 const PRINTF_SPECIFIER_MISMATCH: usize = 10048;
 const UNRECOGNIZED_CONVERSION_SPECIFICATION: usize = 10049;
 const WRONG_NUMBER_OF_CONVERSIONS: usize = 10050;
+const WRONG_NUMBER_OF_ARGUMENTS_FOR_CONVERSION: usize = 10051;
+const BAD_ARG_FOR_STAR: usize = 10052;
 
 /// If `$cond` is true, panic using `$reason` (used as an invalid array index).
 ///
@@ -104,95 +104,14 @@ enum ConvSpecifier {
 /// `false`.
 #[allow(unconditional_panic)]
 const fn does_fmt_match_args_list<T: PrintfArgsList>(fmt: &[c_char], start_idx: usize, panic_on_false: bool) -> bool {
-    use LengthModifier as LM;
-    use ConvSpecifier as CS;
-
     let pf = panic_on_false;
 
     match (next_conversion_specification(fmt, start_idx), T::IS_EMPTY) {
         (None, true) => true,
         (Some(conv_start), false) => {
             if let Ok((spec, after_conv)) = parse_conversion_specification(fmt, conv_start) {
-                // See if we find grounds for rejection in the current
-                // conversion specification...
-
-                // Check starred width, precision:
-                let num_stars = (spec.width_is_arg as usize) + (spec.precision_is_arg as usize);
-
-                if num_stars != T::First::NUM_STARS_USED {
-                    if_then_panic!(pf, WRONG_NUMBER_OF_STARS_IN_SPECIFICATION);
-                    return false;
-                }
-
-                if T::First::NEEDS_STAR_PRECISION && !spec.precision_is_arg {
-                    if_then_panic!(pf, PRECISION_MUST_BE_STAR);
-                    return false;
-                }
-
-                match spec.specifier {
-                    CS::Integer => {
-                        let is_compatible_type = match spec.length_modifier {
-                            None               => T::First::IS_INT,
-                            Some(LM::CharLen)  => T::First::IS_CHAR,
-                            Some(LM::Short)    => T::First::IS_SHORT,
-                            Some(LM::Long)     => T::First::IS_LONG,
-                            Some(LM::LongLong) => T::First::IS_LONG_LONG,
-                            Some(LM::Max)      => T::First::IS_MAX,
-                            Some(LM::Size)     => T::First::IS_SIZE,
-                            Some(LM::Ptrdiff)  => T::First::IS_PTRDIFF,
-                            Some(LM::LongDouble) => false,
-                        };
-
-                        if !is_compatible_type {
-                            if_then_panic!(pf, INTEGER_WIDTH_MISMATCH_IN_SPECIFICATION);
-                            return false;
-                        }
-                    },
-                    CS::Double => {
-                        if let Some(_) = spec.length_modifier {
-                            if_then_panic!(pf, UNSUPPORTED_LENGTH_MODIFIER);
-                            return false;
-                        }
-                        if !T::First::IS_FLOAT {
-                            if_then_panic!(pf, PRINTF_SPECIFIER_MISMATCH);
-                            return false;
-                        }
-                    },
-                    CS::Char => {
-                        if let Some(_) = spec.length_modifier {
-                            if_then_panic!(pf, UNSUPPORTED_LENGTH_MODIFIER);
-                            return false;
-                        }
-                        if !T::First::IS_CHAR {
-                            if_then_panic!(pf, PRINTF_SPECIFIER_MISMATCH);
-                            return false;
-                        }
-                    },
-                    CS::String => {
-                        if let Some(_) = spec.length_modifier {
-                            if_then_panic!(pf, UNSUPPORTED_LENGTH_MODIFIER);
-                            return false;
-                        }
-                        if !T::First::IS_C_STRING {
-                            if_then_panic!(pf, PRINTF_SPECIFIER_MISMATCH);
-                            return false;
-                        }
-                    },
-                    CS::Pointer => {
-                        if let Some(_) = spec.length_modifier {
-                            if_then_panic!(pf, UNSUPPORTED_LENGTH_MODIFIER);
-                            return false;
-                        }
-                        if !T::First::IS_POINTER {
-                            if_then_panic!(pf, PRINTF_SPECIFIER_MISMATCH);
-                            return false;
-                        }
-                    },
-                };
-
-                // ...and if not, recurse on the remainder of the format string
-                // and argument list.
-                does_fmt_match_args_list::<T::Rest>(fmt, after_conv, panic_on_false)
+                // Check conversion specification:
+                does_convspec_match_arg::<T>(spec, fmt, after_conv, pf)
             } else {
                 if_then_panic!(pf, UNRECOGNIZED_CONVERSION_SPECIFICATION);
                 false
@@ -203,6 +122,137 @@ const fn does_fmt_match_args_list<T: PrintfArgsList>(fmt: &[c_char], start_idx: 
             false
         },
     }
+}
+
+/// Recursive part of [`does_fmt_match_args_list`]. Specifically, this
+/// tests whether the first element of the [`PrintfArgsList`] `T` is an
+/// acceptable first argument for the conversion specification `spec`,
+/// then recurses over (1) the rest of `T` and (2) either the rest of
+/// the conversion specification (for specifications with `*`) or the
+/// rest of the format string `fmt` (starting at `next_idx`).
+///
+/// Panics instead of returning `false` if `panic_on_false` is true.
+#[allow(unconditional_panic)]
+const fn does_convspec_match_arg<T: PrintfArgsList>(
+    spec: ConversionSpecification,
+    fmt: &[c_char],
+    next_idx: usize,
+    panic_on_false: bool
+) -> bool {
+    use LengthModifier as LM;
+    use ConvSpecifier as CS;
+
+    let pf = panic_on_false;
+
+    // Make sure we haven't prematurely gotten to the end of the arguments
+    // list...
+    if T::IS_EMPTY {
+        if_then_panic!(pf, WRONG_NUMBER_OF_ARGUMENTS_FOR_CONVERSION);
+        return false;
+    }
+
+    // Let's see if we find grounds for rejection in the current
+    // conversion specification.
+
+    // Check for starred width, precision:
+    if spec.width_is_arg {
+        if !T::First::IS_INT || !T::First::IS_SIGNED {
+            if_then_panic!(pf, BAD_ARG_FOR_STAR);
+            return false;
+        }
+
+        // Recurse on the *rest* of the (conversion specification, args list):
+        return does_convspec_match_arg::<T::Rest>(
+            ConversionSpecification {
+                width_is_arg: false,
+                ..spec
+            },
+            fmt, next_idx, panic_on_false
+        );
+    }
+    if spec.precision_is_arg {
+        if !T::First::IS_INT || !T::First::IS_SIGNED {
+            if_then_panic!(pf, BAD_ARG_FOR_STAR);
+            return false;
+        }
+
+        // Recurse on the *rest* of the (conversion specification, args list):
+        return does_convspec_match_arg::<T::Rest>(
+            ConversionSpecification {
+                precision_is_arg: false,
+                ..spec
+            },
+            fmt, next_idx, panic_on_false
+        );
+    }
+
+    // If we get here, we've gotten past any stars
+    // in the conversion specification:
+
+    match spec.specifier {
+        CS::Integer => {
+            let is_compatible_type = match spec.length_modifier {
+                None               => T::First::IS_INT,
+                Some(LM::CharLen)  => T::First::IS_CHAR,
+                Some(LM::Short)    => T::First::IS_SHORT,
+                Some(LM::Long)     => T::First::IS_LONG,
+                Some(LM::LongLong) => T::First::IS_LONG_LONG,
+                Some(LM::Max)      => T::First::IS_MAX,
+                Some(LM::Size)     => T::First::IS_SIZE,
+                Some(LM::Ptrdiff)  => T::First::IS_PTRDIFF,
+                Some(LM::LongDouble) => false,
+            };
+
+            if !is_compatible_type {
+                if_then_panic!(pf, INTEGER_WIDTH_MISMATCH_IN_SPECIFICATION);
+                return false;
+            }
+        },
+        CS::Double => {
+            if let Some(_) = spec.length_modifier {
+                if_then_panic!(pf, UNSUPPORTED_LENGTH_MODIFIER);
+                return false;
+            }
+            if !T::First::IS_FLOAT {
+                if_then_panic!(pf, PRINTF_SPECIFIER_MISMATCH);
+                return false;
+            }
+        },
+        CS::Char => {
+            if let Some(_) = spec.length_modifier {
+                if_then_panic!(pf, UNSUPPORTED_LENGTH_MODIFIER);
+                return false;
+            }
+            if !T::First::IS_CHAR {
+                if_then_panic!(pf, PRINTF_SPECIFIER_MISMATCH);
+                return false;
+            }
+        },
+        CS::String => {
+            if let Some(_) = spec.length_modifier {
+                if_then_panic!(pf, UNSUPPORTED_LENGTH_MODIFIER);
+                return false;
+            }
+            if !T::First::IS_C_STRING {
+                if_then_panic!(pf, PRINTF_SPECIFIER_MISMATCH);
+                return false;
+            }
+        },
+        CS::Pointer => {
+            if let Some(_) = spec.length_modifier {
+                if_then_panic!(pf, UNSUPPORTED_LENGTH_MODIFIER);
+                return false;
+            }
+            if !T::First::IS_POINTER {
+                if_then_panic!(pf, PRINTF_SPECIFIER_MISMATCH);
+                return false;
+            }
+        },
+    };
+
+    // Nothing wrong in the current specification;
+    // recurse on the remainder of the format string and argument list.
+    does_fmt_match_args_list::<T::Rest>(fmt, next_idx, panic_on_false)
 }
 
 /// Starting at index `start_idx`, returns the index of the initial '`%`'

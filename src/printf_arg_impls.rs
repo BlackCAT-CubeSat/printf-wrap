@@ -2,7 +2,7 @@
 
 //! Implementations of [`PrintfArgument`] and allied traits.
 
-use crate::{PrintfArgumentPrivate, PrintfArgument, PrimitivePrintfArgument};
+use crate::{PrintfArgumentPrivate, PrintfArgument};
 use crate::{LargerOf, NullString, is_compat};
 
 use core::ffi::c_void;
@@ -18,7 +18,7 @@ macro_rules! impl_empty_trait {
 
 impl_empty_trait!(PrintfArgumentPrivate;
     u8, u16, u32, u64, usize, i8, i16, i32, i64, isize, f32, f64,
-    &str, NullString
+    NullString
 );
 
 
@@ -92,11 +92,6 @@ impl PrintfArgument for NullString {
     fn as_c_val(self) -> *const c_char { self.as_ptr() }
 }
 
-impl_empty_trait!(PrimitivePrintfArgument;
-    u8, u16, u32, u64, usize, i8, i16, i32, i64, isize, f32, f64,
-    NullString
-);
-
 #[cfg(feature = "std")]
 impl PrintfArgumentPrivate for &std::ffi::CStr { }
 
@@ -111,9 +106,6 @@ impl PrintfArgument for &std::ffi::CStr {
 }
 
 #[cfg(feature = "std")]
-impl PrimitivePrintfArgument for &std::ffi::CStr { }
-
-#[cfg(feature = "std")]
 impl PrintfArgumentPrivate for &std::ffi::CString { }
 
 #[cfg(feature = "std")]
@@ -126,9 +118,6 @@ impl PrintfArgument for &std::ffi::CString {
     fn as_c_val(self) -> *const c_char { self.as_ptr() }
 }
 
-#[cfg(feature = "std")]
-impl PrimitivePrintfArgument for &std::ffi::CString { }
-
 impl<T: Sized> PrintfArgumentPrivate for *const T { }
 
 impl<T: Sized> PrintfArgument for *const T {
@@ -140,8 +129,6 @@ impl<T: Sized> PrintfArgument for *const T {
     fn as_c_val(self) -> *const c_void { self as *const c_void }
 }
 
-impl<T: Sized> PrimitivePrintfArgument for *const T { }
-
 impl<T: Sized> PrintfArgumentPrivate for *mut T { }
 
 impl<T: Sized> PrintfArgument for *mut T {
@@ -151,101 +138,4 @@ impl<T: Sized> PrintfArgument for *mut T {
 
     #[inline]
     fn as_c_val(self) -> *const c_void { self as *mut c_void as *const c_void }
-}
-
-impl<T: Sized> PrimitivePrintfArgument for *mut T { }
-
-/// Representation of the arguments corresponding to a printf(3) `%.*s`
-/// conversion.
-#[repr(C)]
-pub struct StrSlice {
-    sz: usize,
-    ptr: *const u8,
-}
-
-// Because &str's CPrintfType already takes up two 8-byte words on x86_64,
-// we can't allow this to be used with a(n additional) star argument in
-// a tuple (otherwise the `CPrintType` structure will not always be laid
-// out as a function argument in the same manner as the corresponding
-// disaggregated values (treated as multiple arguments)),
-// so &str isn't also `PrimitivePrintArgument`.
-impl PrintfArgument for &str {
-    const NUM_STARS_USED: usize = 1;
-    const NEEDS_STAR_PRECISION: bool = true;
-
-    type CPrintfType = StrSlice;
-
-    const IS_C_STRING: bool = true;
-
-    #[inline]
-    fn as_c_val(self) -> StrSlice {
-        StrSlice {
-            sz: self.len(),
-            ptr: self.as_ptr(),
-        }
-    }
-}
-
-// IntArg is a hack needed to make sure the layout of StarredArgument,
-// when used as a function argument, is the same as the layout of
-// StarredArgument's star_arg and arg fields if they were used
-// as two sequential function arguments.
-
-#[cfg(not(target_arch = "x86_64"))]
-#[repr(C)]
-struct IntArg {
-  n: c_int,
-}
-
-#[cfg(target_arch = "x86_64")]
-#[repr(C)]
-union IntArg {
-    n: c_int,
-    _ll: u64,
-}
-
-/// A structure for two C-side arguments to a printf(3)-style function;
-/// used as [`CPrintfType`](PrintfArgument::CPrintfType)s by pairs.
-///
-/// It must be two machine words in size or less in order for the
-/// structure representation (in registers and/or memory)
-/// as a function argument to _always_ be the same
-/// as passing `star_arg` and `arg` as two separate-but-adjacent
-/// function arguments on x86-64.
-#[repr(C)]
-pub struct StarredArgument<T> {
-    star_arg: IntArg,
-    arg: T,
-}
-
-impl<T: PrimitivePrintfArgument> PrintfArgumentPrivate for (c_int, T) { }
-
-impl<T: PrimitivePrintfArgument> PrintfArgument for (c_int, T) {
-    const NUM_STARS_USED: usize = T::NUM_STARS_USED + 1;
-    const NEEDS_STAR_PRECISION: bool = T::NEEDS_STAR_PRECISION;
-
-    const IS_CHAR: bool      = T::IS_CHAR;
-    const IS_SHORT: bool     = T::IS_SHORT;
-    const IS_INT: bool       = T::IS_INT;
-    const IS_LONG: bool      = T::IS_LONG;
-    const IS_LONG_LONG: bool = T::IS_LONG_LONG;
-
-    const IS_SIZE: bool      = T::IS_SIZE;
-    const IS_MAX: bool       = T::IS_MAX;
-    const IS_PTRDIFF: bool   = T::IS_PTRDIFF;
-
-    const IS_SIGNED: bool    = T::IS_SIGNED;
-    const IS_FLOAT: bool     = T::IS_FLOAT;
-    const IS_C_STRING: bool  = T::IS_C_STRING;
-    const IS_POINTER: bool   = T::IS_POINTER;
-
-    type CPrintfType = StarredArgument<T::CPrintfType>;
-
-    #[inline]
-    fn as_c_val(self) -> StarredArgument<T::CPrintfType> {
-        StarredArgument {
-            star_arg: IntArg { n: self.0 },
-            arg: self.1.as_c_val(),
-        }
-    }
 }
