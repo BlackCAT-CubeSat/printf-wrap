@@ -134,7 +134,7 @@ impl NullString {
 macro_rules! null_str {
     ($str:expr) => {
         {
-            const STR: NullString = $crate::NullString::new(concat!($str, "\0"));
+            const STR: $crate::NullString = $crate::NullString::new(concat!($str, "\0"));
             STR
         }
     };

@@ -121,7 +121,11 @@ mod abi_check {
                     $crate::PrintfFmt::new(concat!($fmt, "\0")).unwrap(),
                     $( $arg ),*
                 );
-                assert_eq!(p, $expected, "snprintf was not given the arguments correctly");
+                assert_eq!(
+                    std::str::from_utf8(p),
+                    std::str::from_utf8($expected),
+                    "snprintf was not given the arguments correctly"
+                );
             }
         };
     }
