@@ -4,7 +4,7 @@
 
 use libc::c_char;
 
-use crate::{PrintfArgument, PrintfArgs, PrintfArgsList, c};
+use crate::{c, PrintfArgs, PrintfArgsList, PrintfArgument};
 
 /// Returns whether `fmt` is (1) a valid C-style string and (2) a format
 /// string compatible with the tuple of arguments `T` when used in a
@@ -13,9 +13,14 @@ use crate::{PrintfArgument, PrintfArgs, PrintfArgsList, c};
 /// If `panic_on_false` is true, panics instead of returning `false`.
 #[allow(unconditional_panic)]
 #[inline]
-pub(crate) const fn is_fmt_valid_for_args<T: PrintfArgs>(fmt: &[c_char], panic_on_false: bool) -> bool {
+pub(crate) const fn is_fmt_valid_for_args<T: PrintfArgs>(
+    fmt: &[c_char],
+    panic_on_false: bool,
+) -> bool {
     if !is_null_terminated(fmt) {
-        if panic_on_false { panic!("Candidate format string is not null-terminated!"); }
+        if panic_on_false {
+            panic!("Candidate format string is not null-terminated!");
+        }
         return false;
     }
     does_fmt_match_args_list::<T::AsList>(fmt, 0, panic_on_false)
@@ -75,7 +80,11 @@ enum ConvSpecifier {
 /// If it is not and `panic_on_false` is true, panics instead of returning
 /// `false`.
 #[allow(unconditional_panic)]
-const fn does_fmt_match_args_list<T: PrintfArgsList>(fmt: &[c_char], start_idx: usize, panic_on_false: bool) -> bool {
+const fn does_fmt_match_args_list<T: PrintfArgsList>(
+    fmt: &[c_char],
+    start_idx: usize,
+    panic_on_false: bool,
+) -> bool {
     match (next_conversion_specification(fmt, start_idx), T::IS_EMPTY) {
         (None, true) => true,
         (Some(conv_start), false) => {
@@ -83,14 +92,18 @@ const fn does_fmt_match_args_list<T: PrintfArgsList>(fmt: &[c_char], start_idx: 
                 // Check conversion specification:
                 does_convspec_match_arg::<T>(spec, fmt, after_conv, panic_on_false)
             } else {
-                if panic_on_false { panic!("Unrecognized conversion specification!"); }
+                if panic_on_false {
+                    panic!("Unrecognized conversion specification!");
+                }
                 false
             }
-        },
+        }
         _ => {
-            if panic_on_false { panic!("Wrong number of conversions!"); }
+            if panic_on_false {
+                panic!("Wrong number of conversions!");
+            }
             false
-        },
+        }
     }
 }
 
@@ -107,15 +120,17 @@ const fn does_convspec_match_arg<T: PrintfArgsList>(
     spec: ConversionSpecification,
     fmt: &[c_char],
     next_idx: usize,
-    panic_on_false: bool
+    panic_on_false: bool,
 ) -> bool {
-    use LengthModifier as LM;
     use ConvSpecifier as CS;
+    use LengthModifier as LM;
 
     // Make sure we haven't prematurely gotten to the end of the arguments
     // list...
     if T::IS_EMPTY {
-        if panic_on_false { panic!("Wrong number of arguments for conversion!"); }
+        if panic_on_false {
+            panic!("Wrong number of arguments for conversion!");
+        }
         return false;
     }
 
@@ -125,32 +140,34 @@ const fn does_convspec_match_arg<T: PrintfArgsList>(
     // Check for starred width, precision:
     if spec.width_is_arg {
         if !T::First::IS_INT || !T::First::IS_SIGNED {
-            if panic_on_false { panic!("Bad argument for starred width!"); }
+            if panic_on_false {
+                panic!("Bad argument for starred width!");
+            }
             return false;
         }
 
         // Recurse on the *rest* of the (conversion specification, args list):
         return does_convspec_match_arg::<T::Rest>(
-            ConversionSpecification {
-                width_is_arg: false,
-                ..spec
-            },
-            fmt, next_idx, panic_on_false
+            ConversionSpecification { width_is_arg: false, ..spec },
+            fmt,
+            next_idx,
+            panic_on_false,
         );
     }
     if spec.precision_is_arg {
         if !T::First::IS_INT || !T::First::IS_SIGNED {
-            if panic_on_false { panic!("Bad argument for starred precision!"); }
+            if panic_on_false {
+                panic!("Bad argument for starred precision!");
+            }
             return false;
         }
 
         // Recurse on the *rest* of the (conversion specification, args list):
         return does_convspec_match_arg::<T::Rest>(
-            ConversionSpecification {
-                precision_is_arg: false,
-                ..spec
-            },
-            fmt, next_idx, panic_on_false
+            ConversionSpecification { precision_is_arg: false, ..spec },
+            fmt,
+            next_idx,
+            panic_on_false,
         );
     }
 
@@ -160,39 +177,47 @@ const fn does_convspec_match_arg<T: PrintfArgsList>(
     match spec.specifier {
         CS::Integer => {
             let is_compatible_type = match spec.length_modifier {
-                None               => T::First::IS_INT,
-                Some(LM::CharLen)  => T::First::IS_CHAR,
-                Some(LM::Short)    => T::First::IS_SHORT,
-                Some(LM::Long)     => T::First::IS_LONG,
+                None => T::First::IS_INT,
+                Some(LM::CharLen) => T::First::IS_CHAR,
+                Some(LM::Short) => T::First::IS_SHORT,
+                Some(LM::Long) => T::First::IS_LONG,
                 Some(LM::LongLong) => T::First::IS_LONG_LONG,
-                Some(LM::Max)      => T::First::IS_MAX,
-                Some(LM::Size)     => T::First::IS_SIZE,
-                Some(LM::Ptrdiff)  => T::First::IS_PTRDIFF,
+                Some(LM::Max) => T::First::IS_MAX,
+                Some(LM::Size) => T::First::IS_SIZE,
+                Some(LM::Ptrdiff) => T::First::IS_PTRDIFF,
                 Some(LM::LongDouble) => false,
             };
 
             if !is_compatible_type {
-                if panic_on_false { panic!("Integer width mismatch in specification!"); }
+                if panic_on_false {
+                    panic!("Integer width mismatch in specification!");
+                }
                 return false;
             }
-        },
+        }
         s @ (CS::Double | CS::Char | CS::String | CS::Pointer) => {
             let is_compatible_type = match s {
-                CS::Double  => T::First::IS_FLOAT,
-                CS::Char    => T::First::IS_CHAR,
-                CS::String  => T::First::IS_C_STRING,
+                CS::Double => T::First::IS_FLOAT,
+                CS::Char => T::First::IS_CHAR,
+                CS::String => T::First::IS_C_STRING,
                 CS::Pointer => T::First::IS_POINTER,
-                _           => { return false; },
+                _ => {
+                    return false;
+                }
             };
             if let Some(_) = spec.length_modifier {
-                if panic_on_false { panic!("Unsupported length modifier!"); }
+                if panic_on_false {
+                    panic!("Unsupported length modifier!");
+                }
                 return false;
             }
             if !is_compatible_type {
-                if panic_on_false { panic!("printf(3) specifier mismatch!"); }
+                if panic_on_false {
+                    panic!("printf(3) specifier mismatch!");
+                }
                 return false;
             }
-        },
+        }
     };
 
     // Nothing wrong in the current specification;
@@ -207,11 +232,14 @@ const fn next_conversion_specification(fmt: &[c_char], start_idx: usize) -> Opti
     let len = fmt.len();
     let mut i: usize = start_idx;
 
-    if len == 0 { return None; }
+    if len == 0 {
+        return None;
+    }
 
     while i < len {
         if fmt[i] == c(b'%') {
-            if i < len-1 && fmt[i+1] == c(b'%') { // skip over '%%':
+            // skip over '%%':
+            if i < len - 1 && fmt[i + 1] == c(b'%') {
                 i += 2;
             } else {
                 return Some(i);
@@ -231,16 +259,22 @@ const fn next_conversion_specification(fmt: &[c_char], start_idx: usize) -> Opti
 /// returns a pair consisting of a [`ConversionSpecification`] describing the
 /// specification and a `usize` containing the index of the
 /// first character after the specification; otherwise returns `Err`.
-const fn parse_conversion_specification(fmt: &[c_char], start_idx: usize)
-    -> Result<(ConversionSpecification, usize), ()> {
-    use LengthModifier::*;
+const fn parse_conversion_specification(
+    fmt: &[c_char],
+    start_idx: usize,
+) -> Result<(ConversionSpecification, usize), ()> {
     use ConvSpecifier::*;
+    use LengthModifier::*;
 
     let len = fmt.len();
 
-    if len < 2 || start_idx > len - 2 { return Err(()); }
+    if len < 2 || start_idx > len - 2 {
+        return Err(());
+    }
 
-    if fmt[start_idx] != c(b'%') { return Err(()); }
+    if fmt[start_idx] != c(b'%') {
+        return Err(());
+    }
 
     let mut i = start_idx + 1;
 
@@ -248,45 +282,62 @@ const fn parse_conversion_specification(fmt: &[c_char], start_idx: usize)
     while i < len {
         match fmt[i] as u8 {
             b'\'' | b'-' | b'+' | b'#' | b'0' | b' ' => (),
-            _ => { break; }
+            _ => {
+                break;
+            }
         };
         i += 1;
     }
 
     // There must be more to the conversion specification at this point:
-    if i >= len { return Err(()); }
+    if i >= len {
+        return Err(());
+    }
 
     // See whether the field width (if any) is '*':
     let width_is_arg = match fmt[i] as u8 {
-        b'*' => { i += 1; true },
+        b'*' => {
+            i += 1;
+            true
+        }
         _ => {
             // Skip over any digits; if they exist, they're the field width.
-            while i < len && (fmt[i] as u8).is_ascii_digit() { i += 1; }
+            while i < len && (fmt[i] as u8).is_ascii_digit() {
+                i += 1;
+            }
             false
         }
     };
 
     // Must still be more:
-    if i >= len { return Err(()); }
+    if i >= len {
+        return Err(());
+    }
 
     // If the next character is '.', we have a precision:
     let precision_is_arg = if fmt[i] != c(b'.') {
         false
     } else {
         i += 1;
-        if i >= len { return Err(()); }
+        if i >= len {
+            return Err(());
+        }
         if fmt[i] == c(b'*') {
             i += 1;
             true
         } else {
             // Skip over any decimal digits -- they're part of the precision
-            while i < len && (fmt[i] as u8).is_ascii_digit() { i += 1; }
+            while i < len && (fmt[i] as u8).is_ascii_digit() {
+                i += 1;
+            }
             false
         }
     };
 
     // Must still be yet more:
-    if i >= len { return Err(()); }
+    if i >= len {
+        return Err(());
+    }
 
     // OK, look for a length modifier, if any:
     let length_modifier: Option<LengthModifier> = match fmt[i] as u8 {
@@ -298,7 +349,7 @@ const fn parse_conversion_specification(fmt: &[c_char], start_idx: usize)
             } else {
                 Some(Short)
             }
-        },
+        }
         b'l' => {
             i += 1;
             if i < len && fmt[i] == c(b'l') {
@@ -307,26 +358,42 @@ const fn parse_conversion_specification(fmt: &[c_char], start_idx: usize)
             } else {
                 Some(Long)
             }
-        },
-        b'j' => { i += 1; Some(Max) },
-        b'z' => { i += 1; Some(Size) },
-        b't' => { i += 1; Some(Ptrdiff) },
-        b'L' => { i += 1; Some(LongDouble) },
+        }
+        b'j' => {
+            i += 1;
+            Some(Max)
+        }
+        b'z' => {
+            i += 1;
+            Some(Size)
+        }
+        b't' => {
+            i += 1;
+            Some(Ptrdiff)
+        }
+        b'L' => {
+            i += 1;
+            Some(LongDouble)
+        }
         _ => None,
     };
 
     // Must still be at least one more character:
-    if i >= len { return Err(()); }
+    if i >= len {
+        return Err(());
+    }
 
     // We've passed over any previous parts of the specification, so the
     // next character *must* be the conversion specifier:
     let spec: ConvSpecifier = match fmt[i] as u8 {
-        b'd' | b'i' | b'o' | b'u' | b'x' | b'X' => { Integer },
-        b'f' | b'F' | b'e' | b'E' | b'g' | b'G' | b'a' | b'A' => { Double },
-        b'c' => { Char },
-        b's' => { String },
-        b'p' => { Pointer },
-        _ => { return Err(()); },
+        b'd' | b'i' | b'o' | b'u' | b'x' | b'X' => Integer,
+        b'f' | b'F' | b'e' | b'E' | b'g' | b'G' | b'a' | b'A' => Double,
+        b'c' => Char,
+        b's' => String,
+        b'p' => Pointer,
+        _ => {
+            return Err(());
+        }
     };
 
     let conv = ConversionSpecification {
@@ -336,7 +403,7 @@ const fn parse_conversion_specification(fmt: &[c_char], start_idx: usize)
         specifier: spec,
     };
 
-    Ok((conv, i+1))
+    Ok((conv, i + 1))
 }
 
 /// Is `s` (a candidate for being a C string) null-terminated, and does
