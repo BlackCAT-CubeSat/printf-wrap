@@ -176,42 +176,19 @@ const fn does_convspec_match_arg<T: PrintfArgsList>(
                 return false;
             }
         },
-        CS::Double => {
+        s @ (CS::Double | CS::Char | CS::String | CS::Pointer) => {
+            let is_compatible_type = match s {
+                CS::Double  => T::First::IS_FLOAT,
+                CS::Char    => T::First::IS_CHAR,
+                CS::String  => T::First::IS_C_STRING,
+                CS::Pointer => T::First::IS_POINTER,
+                _           => { return false; },
+            };
             if let Some(_) = spec.length_modifier {
                 if panic_on_false { panic!("Unsupported length modifier!"); }
                 return false;
             }
-            if !T::First::IS_FLOAT {
-                if panic_on_false { panic!("printf(3) specifier mismatch!"); }
-                return false;
-            }
-        },
-        CS::Char => {
-            if let Some(_) = spec.length_modifier {
-                if panic_on_false { panic!("Unsupported length modifier!"); }
-                return false;
-            }
-            if !T::First::IS_CHAR {
-                if panic_on_false { panic!("printf(3) specifier mismatch!"); }
-                return false;
-            }
-        },
-        CS::String => {
-            if let Some(_) = spec.length_modifier {
-                if panic_on_false { panic!("Unsupported length modifier!"); }
-                return false;
-            }
-            if !T::First::IS_C_STRING {
-                if panic_on_false { panic!("printf(3) specifier mismatch!"); }
-                return false;
-            }
-        },
-        CS::Pointer => {
-            if let Some(_) = spec.length_modifier {
-                if panic_on_false { panic!("Unsupported length modifier!"); }
-                return false;
-            }
-            if !T::First::IS_POINTER {
+            if !is_compatible_type {
                 if panic_on_false { panic!("printf(3) specifier mismatch!"); }
                 return false;
             }
