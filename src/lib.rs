@@ -86,15 +86,9 @@ impl NullString {
     #[allow(unconditional_panic)]
     #[deny(const_err)]
     pub const fn new(s: &'static str) -> NullString {
-        const PANIC: [c_char; 0] = [];
-        const NOT_NULL_TERMINATED: usize = 42;
-
         let bytes = s.as_bytes();
         if bytes.len() == 0 || bytes[bytes.len() - 1] != b'\0' {
-            // out-of-bounds reference as a workaround for not being able
-            // to panic!() in a const fn
-            let x: &c_char = &PANIC[NOT_NULL_TERMINATED];
-            return NullString { s: x as *const c_char };
+            panic!("string passed to NullString::new is not null-terminated!");
         }
 
         NullString { s: bytes.as_ptr() as *const c_char }
@@ -279,19 +273,8 @@ impl<T: PrintfArgs> PrintfFmt<T> {
     #[allow(unconditional_panic)]
     #[inline]
     pub const fn new_or_panic(fmt: &'static str) -> Self {
-        const PANIC: [c_char; 0] = [];
-        const U8_IS_NOT_CHAR_SIZED: usize = 10043;
-
         if !is_compat::<u8, c_char>() {
-            // We do out-of-bounds indexing, as we can't currently use
-            // panic! in const fns.
-            let p = &PANIC[U8_IS_NOT_CHAR_SIZED] as *const c_char;
-
-            return PrintfFmt {
-                fmt: p,
-                _x: CompatibleSystem { },
-                _y: PhantomData,
-            };
+            panic!("u8 and c_char have different sizes/alignments, somehow");
         }
 
         let fmt_as_cstr: &'static [c_char] = unsafe {

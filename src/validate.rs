@@ -6,32 +6,6 @@ use libc::c_char;
 
 use crate::{PrintfArgument, PrintfArgs, PrintfArgsList, c};
 
-/// This array is used by functions below to panic at compile time:
-/// we can't use panic!() in `const fn`s,
-/// but out-of-bounds indices work as a surrogate.
-const PANIC: [u8; 0] = [];
-
-// "Indices" to use with PANIC
-const NOT_NULL_TERMINATED: usize = 10042;
-const INTEGER_WIDTH_MISMATCH_IN_SPECIFICATION: usize = 10046;
-const UNSUPPORTED_LENGTH_MODIFIER: usize = 10047;
-const PRINTF_SPECIFIER_MISMATCH: usize = 10048;
-const UNRECOGNIZED_CONVERSION_SPECIFICATION: usize = 10049;
-const WRONG_NUMBER_OF_CONVERSIONS: usize = 10050;
-const WRONG_NUMBER_OF_ARGUMENTS_FOR_CONVERSION: usize = 10051;
-const BAD_ARG_FOR_STAR: usize = 10052;
-
-/// If `$cond` is true, panic using `$reason` (used as an invalid array index).
-///
-/// This macro can be used at compile time, whereas [`panic!`] currently can't.
-macro_rules! if_then_panic {
-    ($cond:tt, $reason:tt) => {
-        if $cond {
-            return PANIC[$reason] != 0;
-        }
-    };
-}
-
 /// Returns whether `fmt` is (1) a valid C-style string and (2) a format
 /// string compatible with the tuple of arguments `T` when used in a
 /// printf(3)-like function.
@@ -40,10 +14,8 @@ macro_rules! if_then_panic {
 #[allow(unconditional_panic)]
 #[inline]
 pub(crate) const fn is_fmt_valid_for_args<T: PrintfArgs>(fmt: &[c_char], panic_on_false: bool) -> bool {
-    let pf = panic_on_false;
-
     if !is_null_terminated(fmt) {
-        if_then_panic!(pf, NOT_NULL_TERMINATED);
+        if panic_on_false { panic!("Candidate format string is not null-terminated!"); }
         return false;
     }
     does_fmt_match_args_list::<T::AsList>(fmt, 0, panic_on_false)
@@ -104,21 +76,19 @@ enum ConvSpecifier {
 /// `false`.
 #[allow(unconditional_panic)]
 const fn does_fmt_match_args_list<T: PrintfArgsList>(fmt: &[c_char], start_idx: usize, panic_on_false: bool) -> bool {
-    let pf = panic_on_false;
-
     match (next_conversion_specification(fmt, start_idx), T::IS_EMPTY) {
         (None, true) => true,
         (Some(conv_start), false) => {
             if let Ok((spec, after_conv)) = parse_conversion_specification(fmt, conv_start) {
                 // Check conversion specification:
-                does_convspec_match_arg::<T>(spec, fmt, after_conv, pf)
+                does_convspec_match_arg::<T>(spec, fmt, after_conv, panic_on_false)
             } else {
-                if_then_panic!(pf, UNRECOGNIZED_CONVERSION_SPECIFICATION);
+                if panic_on_false { panic!("Unrecognized conversion specification!"); }
                 false
             }
         },
         _ => {
-            if_then_panic!(pf, WRONG_NUMBER_OF_CONVERSIONS);
+            if panic_on_false { panic!("Wrong number of conversions!"); }
             false
         },
     }
@@ -142,12 +112,10 @@ const fn does_convspec_match_arg<T: PrintfArgsList>(
     use LengthModifier as LM;
     use ConvSpecifier as CS;
 
-    let pf = panic_on_false;
-
     // Make sure we haven't prematurely gotten to the end of the arguments
     // list...
     if T::IS_EMPTY {
-        if_then_panic!(pf, WRONG_NUMBER_OF_ARGUMENTS_FOR_CONVERSION);
+        if panic_on_false { panic!("Wrong number of arguments for conversion!"); }
         return false;
     }
 
@@ -157,7 +125,7 @@ const fn does_convspec_match_arg<T: PrintfArgsList>(
     // Check for starred width, precision:
     if spec.width_is_arg {
         if !T::First::IS_INT || !T::First::IS_SIGNED {
-            if_then_panic!(pf, BAD_ARG_FOR_STAR);
+            if panic_on_false { panic!("Bad argument for starred width!"); }
             return false;
         }
 
@@ -172,7 +140,7 @@ const fn does_convspec_match_arg<T: PrintfArgsList>(
     }
     if spec.precision_is_arg {
         if !T::First::IS_INT || !T::First::IS_SIGNED {
-            if_then_panic!(pf, BAD_ARG_FOR_STAR);
+            if panic_on_false { panic!("Bad argument for starred precision!"); }
             return false;
         }
 
@@ -204,47 +172,47 @@ const fn does_convspec_match_arg<T: PrintfArgsList>(
             };
 
             if !is_compatible_type {
-                if_then_panic!(pf, INTEGER_WIDTH_MISMATCH_IN_SPECIFICATION);
+                if panic_on_false { panic!("Integer width mismatch in specification!"); }
                 return false;
             }
         },
         CS::Double => {
             if let Some(_) = spec.length_modifier {
-                if_then_panic!(pf, UNSUPPORTED_LENGTH_MODIFIER);
+                if panic_on_false { panic!("Unsupported length modifier!"); }
                 return false;
             }
             if !T::First::IS_FLOAT {
-                if_then_panic!(pf, PRINTF_SPECIFIER_MISMATCH);
+                if panic_on_false { panic!("printf(3) specifier mismatch!"); }
                 return false;
             }
         },
         CS::Char => {
             if let Some(_) = spec.length_modifier {
-                if_then_panic!(pf, UNSUPPORTED_LENGTH_MODIFIER);
+                if panic_on_false { panic!("Unsupported length modifier!"); }
                 return false;
             }
             if !T::First::IS_CHAR {
-                if_then_panic!(pf, PRINTF_SPECIFIER_MISMATCH);
+                if panic_on_false { panic!("printf(3) specifier mismatch!"); }
                 return false;
             }
         },
         CS::String => {
             if let Some(_) = spec.length_modifier {
-                if_then_panic!(pf, UNSUPPORTED_LENGTH_MODIFIER);
+                if panic_on_false { panic!("Unsupported length modifier!"); }
                 return false;
             }
             if !T::First::IS_C_STRING {
-                if_then_panic!(pf, PRINTF_SPECIFIER_MISMATCH);
+                if panic_on_false { panic!("printf(3) specifier mismatch!"); }
                 return false;
             }
         },
         CS::Pointer => {
             if let Some(_) = spec.length_modifier {
-                if_then_panic!(pf, UNSUPPORTED_LENGTH_MODIFIER);
+                if panic_on_false { panic!("Unsupported length modifier!"); }
                 return false;
             }
             if !T::First::IS_POINTER {
-                if_then_panic!(pf, PRINTF_SPECIFIER_MISMATCH);
+                if panic_on_false { panic!("printf(3) specifier mismatch!"); }
                 return false;
             }
         },
