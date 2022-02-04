@@ -4,8 +4,8 @@
 
 #![cfg(test)]
 
-use libc::{c_char, c_uchar, c_ushort, c_int, c_uint, c_long, c_ulonglong};
 use crate::NullString;
+use libc::{c_char, c_int, c_long, c_uchar, c_uint, c_ulonglong, c_ushort};
 
 macro_rules! generate_construction_panic_case {
     ( $( $fn_name:ident, $str:expr, $args:tt ; )* ) => {
@@ -90,8 +90,9 @@ mod abi_check {
     use crate::example::*;
 
     #[allow(unused_imports)]
-    use libc::{c_char, c_uchar, c_short, c_ushort, c_int, c_uint,
-               c_long, c_ulong, c_longlong, c_ulonglong};
+    use libc::{
+        c_char, c_int, c_long, c_longlong, c_short, c_uchar, c_uint, c_ulong, c_ulonglong, c_ushort,
+    };
 
     macro_rules! test_using_snprintf {
         ($( $fn_name:ident, $snprintf_variant:ident, $fmt:expr, $args:tt :

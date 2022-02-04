@@ -34,7 +34,6 @@
 //! [FreeBSD]: https://www.freebsd.org/cgi/man.cgi?printf%283%29
 
 #![no_std]
-
 #![feature(const_fn_trait_bound)]
 
 // We only aim for compatibility with printf(3) as specified in POSIX:
@@ -42,8 +41,8 @@
 
 /// Marker structure used to ensure this crate only sucessfully compiles for
 /// known-compatible systems.
-#[derive(Clone,Copy)]
-struct CompatibleSystem { }
+#[derive(Clone, Copy)]
+struct CompatibleSystem {}
 
 // We use `libc` for types.
 extern crate libc;
@@ -55,16 +54,15 @@ extern crate std;
 use core::marker::PhantomData;
 use libc::c_char;
 
-use crate::validate::is_fmt_valid_for_args;
 use crate::private::PrintfArgumentPrivate;
+use crate::validate::is_fmt_valid_for_args;
 
 /// Traits used to implement private details of [sealed traits].
 ///
 /// [sealed traits]: https://rust-lang.github.io/api-guidelines/future-proofing.html
 mod private {
     /// Marker trait for [`PrintfArgument`](`super::PrintfArgument`).
-    pub trait PrintfArgumentPrivate {
-    }
+    pub trait PrintfArgumentPrivate {}
 }
 
 mod larger_of;
@@ -77,7 +75,7 @@ mod validate;
 /// as these can be made as compile-time constants.
 #[derive(Clone, Copy)]
 pub struct NullString {
-    s: *const c_char
+    s: *const c_char,
 }
 
 impl NullString {
@@ -86,15 +84,9 @@ impl NullString {
     #[allow(unconditional_panic)]
     #[deny(const_err)]
     pub const fn new(s: &'static str) -> NullString {
-        const PANIC: [c_char; 0] = [];
-        const NOT_NULL_TERMINATED: usize = 42;
-
         let bytes = s.as_bytes();
         if bytes.len() == 0 || bytes[bytes.len() - 1] != b'\0' {
-            // out-of-bounds reference as a workaround for not being able
-            // to panic!() in a const fn
-            let x: &c_char = &PANIC[NOT_NULL_TERMINATED];
-            return NullString { s: x as *const c_char };
+            panic!("string passed to NullString::new is not null-terminated!");
         }
 
         NullString { s: bytes.as_ptr() as *const c_char }
@@ -111,12 +103,10 @@ impl NullString {
 /// character for you!
 #[macro_export]
 macro_rules! null_str {
-    ($str:expr) => {
-        {
-            const STR: $crate::NullString = $crate::NullString::new(concat!($str, "\0"));
-            STR
-        }
-    };
+    ($str:expr) => {{
+        const STR: $crate::NullString = $crate::NullString::new(concat!($str, "\0"));
+        STR
+    }};
 }
 
 /// A Rust-side argument to a safe wrapper around a printf(3)-like function.
@@ -174,7 +164,7 @@ pub trait PrintfArgument: PrintfArgumentPrivate + Copy {
 /// the use-case is for types where any bit-pattern is
 /// sensible and the types don't have non-trivial drop behavior.
 const fn is_compat<T: Sized, U: Sized>() -> bool {
-    use core::mem::{size_of, align_of};
+    use core::mem::{align_of, size_of};
 
     size_of::<T>() == size_of::<U>() && align_of::<T>() == align_of::<U>()
 }
@@ -240,22 +230,22 @@ macro_rules! make_printf_arguments_tuple {
     };
 }
 
-make_printf_arguments_tuple!( A );
-make_printf_arguments_tuple!( A, B );
-make_printf_arguments_tuple!( A, B, C );
-make_printf_arguments_tuple!( A, B, C, D );
-make_printf_arguments_tuple!( A, B, C, D, E );
-make_printf_arguments_tuple!( A, B, C, D, E, F );
-make_printf_arguments_tuple!( A, B, C, D, E, F, G );
-make_printf_arguments_tuple!( A, B, C, D, E, F, G, H );
-make_printf_arguments_tuple!( A, B, C, D, E, F, G, H, I );
-make_printf_arguments_tuple!( A, B, C, D, E, F, G, H, I, J );
-make_printf_arguments_tuple!( A, B, C, D, E, F, G, H, I, J, K );
-make_printf_arguments_tuple!( A, B, C, D, E, F, G, H, I, J, K, L );
-make_printf_arguments_tuple!( A, B, C, D, E, F, G, H, I, J, K, L, M );
-make_printf_arguments_tuple!( A, B, C, D, E, F, G, H, I, J, K, L, M, N );
-make_printf_arguments_tuple!( A, B, C, D, E, F, G, H, I, J, K, L, M, N, O );
-make_printf_arguments_tuple!( A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P );
+make_printf_arguments_tuple!(A);
+make_printf_arguments_tuple!(A, B);
+make_printf_arguments_tuple!(A, B, C);
+make_printf_arguments_tuple!(A, B, C, D);
+make_printf_arguments_tuple!(A, B, C, D, E);
+make_printf_arguments_tuple!(A, B, C, D, E, F);
+make_printf_arguments_tuple!(A, B, C, D, E, F, G);
+make_printf_arguments_tuple!(A, B, C, D, E, F, G, H);
+make_printf_arguments_tuple!(A, B, C, D, E, F, G, H, I);
+make_printf_arguments_tuple!(A, B, C, D, E, F, G, H, I, J);
+make_printf_arguments_tuple!(A, B, C, D, E, F, G, H, I, J, K);
+make_printf_arguments_tuple!(A, B, C, D, E, F, G, H, I, J, K, L);
+make_printf_arguments_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M);
+make_printf_arguments_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N);
+make_printf_arguments_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O);
+make_printf_arguments_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P);
 
 /// A type-safe wrapper around a C-style string verified to be compatible
 /// with use as a format string for printf(3)-style functions called with
@@ -267,7 +257,9 @@ pub struct PrintfFmt<T: PrintfArgs> {
 }
 
 /// Utility conversion from [`u8`] to [`libc::c_char`].
-const fn c(x: u8) -> c_char { x as c_char }
+const fn c(x: u8) -> c_char {
+    x as c_char
+}
 
 /// The empty C string.
 const EMPTY_C_STRING: *const c_char = &c(b'\0') as *const c_char;
@@ -279,19 +271,8 @@ impl<T: PrintfArgs> PrintfFmt<T> {
     #[allow(unconditional_panic)]
     #[inline]
     pub const fn new_or_panic(fmt: &'static str) -> Self {
-        const PANIC: [c_char; 0] = [];
-        const U8_IS_NOT_CHAR_SIZED: usize = 10043;
-
         if !is_compat::<u8, c_char>() {
-            // We do out-of-bounds indexing, as we can't currently use
-            // panic! in const fns.
-            let p = &PANIC[U8_IS_NOT_CHAR_SIZED] as *const c_char;
-
-            return PrintfFmt {
-                fmt: p,
-                _x: CompatibleSystem { },
-                _y: PhantomData,
-            };
+            panic!("u8 and c_char have different sizes/alignments, somehow");
         }
 
         let fmt_as_cstr: &'static [c_char] = unsafe {
@@ -307,11 +288,7 @@ impl<T: PrintfArgs> PrintfFmt<T> {
             EMPTY_C_STRING
         };
 
-        PrintfFmt {
-            fmt: s,
-            _x: CompatibleSystem { },
-            _y: PhantomData,
-        }
+        PrintfFmt { fmt: s, _x: CompatibleSystem {}, _y: PhantomData }
     }
 
     /// If `fmt` represents a valid, supported format string for printf(3)
@@ -331,11 +308,7 @@ impl<T: PrintfArgs> PrintfFmt<T> {
         };
 
         if is_fmt_valid_for_args::<T>(fmt_as_cstr, false) {
-            Ok(PrintfFmt {
-                fmt: fmt_as_cstr.as_ptr(),
-                _x: CompatibleSystem { },
-                _y: PhantomData,
-            })
+            Ok(PrintfFmt { fmt: fmt_as_cstr.as_ptr(), _x: CompatibleSystem {}, _y: PhantomData })
         } else {
             Err(())
         }
@@ -354,7 +327,7 @@ impl<T: PrintfArgs> Clone for PrintfFmt<T> {
     }
 }
 
-impl<T: PrintfArgs> Copy for PrintfFmt<T> { }
+impl<T: PrintfArgs> Copy for PrintfFmt<T> {}
 
 /// Returns whether `fmt` is (1) a valid C-style string and (2) a format
 /// string compatible with the tuple of arguments `T` when used in a
@@ -368,8 +341,8 @@ pub const fn is_fmt_valid<T: PrintfArgs>(fmt: &[c_char]) -> bool {
 /// An example of how to use the types and traits of this crate to safely
 /// wrap functions with printf(3)-style format strings and varargs.
 pub mod example {
+    use crate::{PrintfArgument, PrintfFmt};
     use libc::{c_char, c_int};
-    use crate::{PrintfFmt, PrintfArgument};
 
     macro_rules! tuple_impl {
         ($num:tt, $p_name:ident, $snp_name:ident, ( $($t:ident),* ), ( $($var:ident),* )) => {
@@ -419,14 +392,22 @@ pub mod example {
         fn snprintf_test_invocation() {
             let mut x: [u8; 12] = [5u8; 12];
 
-            assert_eq!(snprintf2(&mut x[..], PrintfFmt::new("X %u Y %c\0").unwrap(), 15u32, b'Z'), 8, "snprintf2 return value should be 8");
+            assert_eq!(
+                snprintf2(&mut x[..], PrintfFmt::new("X %u Y %c\0").unwrap(), 15u32, b'Z'),
+                8,
+                "snprintf2 return value should be 8"
+            );
             assert_eq!(&x, b"X 15 Y Z\0\x05\x05\x05", "contents of x");
         }
 
         #[test]
         fn snprintf_no_buffer_overflow() {
             let mut x: [u8; 8] = [5u8; 8];
-            assert_eq!(snprintf1(&mut x[..4], PrintfFmt::new("a%d \0").unwrap(), -100), 6, "snprintf1 return value should be 6");
+            assert_eq!(
+                snprintf1(&mut x[..4], PrintfFmt::new("a%d \0").unwrap(), -100),
+                6,
+                "snprintf1 return value should be 6"
+            );
             assert_eq!(&x[4..], [5u8; 4], "only 4 bytes should have been written by snprintf1");
         }
     }

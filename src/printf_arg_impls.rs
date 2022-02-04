@@ -2,11 +2,11 @@
 
 //! Implementations of [`PrintfArgument`] and allied traits.
 
-use crate::{PrintfArgumentPrivate, PrintfArgument};
-use crate::{LargerOf, NullString, is_compat};
+use crate::{is_compat, LargerOf, NullString};
+use crate::{PrintfArgument, PrintfArgumentPrivate};
 
 use core::ffi::c_void;
-use libc::{c_char, c_int, c_uint, c_double};
+use libc::{c_char, c_double, c_int, c_uint};
 
 macro_rules! impl_empty_trait {
     ($trait_name:ident ; $($implementor:ty),*) => {
@@ -20,7 +20,6 @@ impl_empty_trait!(PrintfArgumentPrivate;
     u8, u16, u32, u64, usize, i8, i16, i32, i64, isize, f32, f64,
     NullString
 );
-
 
 macro_rules! impl_printf_arg_integer {
     ( $( $t:ty, $signed:expr, $int_type:ty );* ) => {
@@ -71,7 +70,9 @@ impl PrintfArgument for f32 {
     type CPrintfType = c_double;
 
     #[inline]
-    fn as_c_val(self) -> c_double { self as c_double }
+    fn as_c_val(self) -> c_double {
+        self as c_double
+    }
 }
 
 impl PrintfArgument for f64 {
@@ -80,7 +81,9 @@ impl PrintfArgument for f64 {
     type CPrintfType = c_double;
 
     #[inline]
-    fn as_c_val(self) -> c_double { self as c_double }
+    fn as_c_val(self) -> c_double {
+        self as c_double
+    }
 }
 
 impl PrintfArgument for NullString {
@@ -89,11 +92,13 @@ impl PrintfArgument for NullString {
     const IS_C_STRING: bool = true;
 
     #[inline]
-    fn as_c_val(self) -> *const c_char { self.as_ptr() }
+    fn as_c_val(self) -> *const c_char {
+        self.as_ptr()
+    }
 }
 
 #[cfg(feature = "std")]
-impl PrintfArgumentPrivate for &std::ffi::CStr { }
+impl PrintfArgumentPrivate for &std::ffi::CStr {}
 
 #[cfg(feature = "std")]
 impl PrintfArgument for &std::ffi::CStr {
@@ -102,11 +107,13 @@ impl PrintfArgument for &std::ffi::CStr {
     const IS_C_STRING: bool = true;
 
     #[inline]
-    fn as_c_val(self) -> *const c_char { self.as_ptr() }
+    fn as_c_val(self) -> *const c_char {
+        self.as_ptr()
+    }
 }
 
 #[cfg(feature = "std")]
-impl PrintfArgumentPrivate for &std::ffi::CString { }
+impl PrintfArgumentPrivate for &std::ffi::CString {}
 
 #[cfg(feature = "std")]
 impl PrintfArgument for &std::ffi::CString {
@@ -115,10 +122,12 @@ impl PrintfArgument for &std::ffi::CString {
     const IS_C_STRING: bool = true;
 
     #[inline]
-    fn as_c_val(self) -> *const c_char { self.as_ptr() }
+    fn as_c_val(self) -> *const c_char {
+        self.as_ptr()
+    }
 }
 
-impl<T: Sized> PrintfArgumentPrivate for *const T { }
+impl<T: Sized> PrintfArgumentPrivate for *const T {}
 
 impl<T: Sized> PrintfArgument for *const T {
     type CPrintfType = *const c_void;
@@ -126,10 +135,12 @@ impl<T: Sized> PrintfArgument for *const T {
     const IS_POINTER: bool = true;
 
     #[inline]
-    fn as_c_val(self) -> *const c_void { self as *const c_void }
+    fn as_c_val(self) -> *const c_void {
+        self as *const c_void
+    }
 }
 
-impl<T: Sized> PrintfArgumentPrivate for *mut T { }
+impl<T: Sized> PrintfArgumentPrivate for *mut T {}
 
 impl<T: Sized> PrintfArgument for *mut T {
     type CPrintfType = *const c_void;
@@ -137,5 +148,7 @@ impl<T: Sized> PrintfArgument for *mut T {
     const IS_POINTER: bool = true;
 
     #[inline]
-    fn as_c_val(self) -> *const c_void { self as *mut c_void as *const c_void }
+    fn as_c_val(self) -> *const c_void {
+        self as *mut c_void as *const c_void
+    }
 }
