@@ -96,6 +96,27 @@ impl NullString {
     pub const fn as_ptr(self) -> *const c_char {
         self.s
     }
+
+    /// Returns a `&`[`std::ffi::CStr`] pointing to the wrapped string.
+    #[cfg(feature = "std")]
+    #[inline]
+    pub fn as_cstr(self) -> &'static std::ffi::CStr {
+        unsafe { std::ffi::CStr::from_ptr(self.s) }
+    }
+}
+
+#[cfg(feature = "std")]
+impl From<&'static std::ffi::CStr> for NullString {
+    fn from(cstr: &'static std::ffi::CStr) -> Self {
+        NullString { s: cstr.as_ptr() }
+    }
+}
+
+#[cfg(feature = "std")]
+impl From<NullString> for &'static std::ffi::CStr {
+    fn from(nstr: NullString) -> Self {
+        nstr.as_cstr()
+    }
 }
 
 /// Convenience macro for creating a [`NullString`]; it appends a null
