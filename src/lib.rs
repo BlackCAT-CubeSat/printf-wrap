@@ -107,6 +107,7 @@ impl NullString {
 
 #[cfg(feature = "std")]
 impl From<&'static std::ffi::CStr> for NullString {
+    #[inline]
     fn from(cstr: &'static std::ffi::CStr) -> Self {
         NullString { s: cstr.as_ptr() }
     }
@@ -114,6 +115,7 @@ impl From<&'static std::ffi::CStr> for NullString {
 
 #[cfg(feature = "std")]
 impl From<NullString> for &'static std::ffi::CStr {
+    #[inline]
     fn from(nstr: NullString) -> Self {
         nstr.as_cstr()
     }
