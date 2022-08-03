@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Types and functions for safely wrapping C functions with printf(3)-style format strings and varargs"
 license = "MIT OR Apache-2.0"
 edition = "2021"
+readme = "README.md"
 categories = ["development-tools::ffi", "no-std"]
 keywords = ["printf", "ffi", "c", "no_std"]
 rust-version = "1.61.0"

@@ -27,12 +27,13 @@
 //! use printf_wrap::{PrintfFmt, PrintfArgument};
 //! use libc::{c_int, printf};
 //!
+//! /// Safe wrapper for calling printf with two value arguments.
 //! pub fn printf_with_2_args<T, U>(fmt: PrintfFmt<(T, U)>, arg1: T, arg2: U) -> c_int
 //! where
 //!     T: PrintfArgument,
 //!     U: PrintfArgument,
 //! {
-//!     unsafe { libc::printf(fmt.as_ptr(), arg1.as_c_val(), arg2.as_c_val()) }
+//!     unsafe { printf(fmt.as_ptr(), arg1.as_c_val(), arg2.as_c_val()) }
 //! }
 //!
 //! fn main() {
