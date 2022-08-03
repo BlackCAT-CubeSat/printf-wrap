@@ -98,10 +98,12 @@ impl PrintfArgument for NullString {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", all(doc, feature = "doccfg")))]
+#[cfg_attr(feature = "doccfg", doc(cfg(feature = "std")))]
 impl PrintfArgumentPrivate for &std::ffi::CStr {}
 
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", all(doc, feature = "doccfg")))]
+#[cfg_attr(feature = "doccfg", doc(cfg(feature = "std")))]
 impl PrintfArgument for &std::ffi::CStr {
     type CPrintfType = *const c_char;
 
@@ -113,10 +115,12 @@ impl PrintfArgument for &std::ffi::CStr {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", all(doc, feature = "doccfg")))]
+#[cfg_attr(feature = "doccfg", doc(cfg(feature = "std")))]
 impl PrintfArgumentPrivate for &std::ffi::CString {}
 
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", all(doc, feature = "doccfg")))]
+#[cfg_attr(feature = "doccfg", doc(cfg(feature = "std")))]
 impl PrintfArgument for &std::ffi::CString {
     type CPrintfType = *const c_char;
 

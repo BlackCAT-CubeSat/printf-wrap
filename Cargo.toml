@@ -9,5 +9,13 @@ edition = "2018"
 libc = { version = "^0.2.0", default-features = false }
 
 [features]
-default = [ "std" ]
+default = ["std"]
+# use the `std` crate:
 std = []
+# use the nightly-only #[doc(cfg(...))]:
+doccfg = []
+
+[package.metadata.docs.rs]
+features = ["std", "doccfg"]
+default-target = "x86_64-unknown-linux-gnu"
+targets = ["x86_64-apple-darwin", "x86_64-unknown-freebsd", "x86_64-unknown-illumos"]

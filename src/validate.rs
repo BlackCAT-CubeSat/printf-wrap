@@ -1,7 +1,7 @@
 // Copyright (c) 2021-2022 The Pennsylvania State University and the project contributors.
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! Utilities for validation of the content of candidate format strings.
+//! Utilities for the validation of the content of candidate format strings.
 
 use libc::c_char;
 
@@ -9,7 +9,9 @@ use crate::{c, PrintfArgs, PrintfArgsList, PrintfArgument};
 
 /// Returns whether `fmt` is (1) a valid C-style string and (2) a format
 /// string compatible with the tuple of arguments `T` when used in a
-/// printf(3)-like function.
+/// `printf(3)`-like function.
+///
+/// # Panics
 ///
 /// If `panic_on_false` is true, panics instead of returning `false`.
 #[allow(unconditional_panic)]
@@ -27,7 +29,7 @@ pub(crate) const fn is_fmt_valid_for_args<T: PrintfArgs>(
     does_fmt_match_args_list::<T::AsList>(fmt, 0, panic_on_false)
 }
 
-/// The type content of a printf(3) conversion specification (excepting "`%%`"):
+/// The type content of a `printf(3)` conversion specification (excepting "`%%`"):
 /// the parts that define the number and types of arguments that are consumed.
 struct ConversionSpecification {
     /// Whether the field width is a function argument (`*`).
@@ -40,7 +42,7 @@ struct ConversionSpecification {
     specifier: ConvSpecifier,
 }
 
-/// A length modifier in a printf(3) conversion specification.
+/// A length modifier in a `printf(3)` conversion specification.
 enum LengthModifier {
     /// `hh`
     CharLen,
@@ -75,11 +77,13 @@ enum ConvSpecifier {
     Pointer,
 }
 
-/// Is `fmt`, treated as a printf(3) format string, compatible with the
+/// Is `fmt`, treated as a `printf(3)` format string, compatible with the
 /// arguments list `T`?
 ///
-/// If it is not and `panic_on_false` is true, panics instead of returning
-/// `false`.
+/// # Panics
+///
+/// If `fmt` is not so compatible and `panic_on_false` is true,
+/// this function panics instead of returning `false`.
 #[allow(unconditional_panic)]
 const fn does_fmt_match_args_list<T: PrintfArgsList>(
     fmt: &[c_char],
@@ -108,12 +112,16 @@ const fn does_fmt_match_args_list<T: PrintfArgsList>(
     }
 }
 
-/// Recursive part of [`does_fmt_match_args_list`]. Specifically, this
+/// Recursive part of [`does_fmt_match_args_list`].
+///
+/// Specifically, this function
 /// tests whether the first element of the [`PrintfArgsList`] `T` is an
 /// acceptable first argument for the conversion specification `spec`,
 /// then recurses over (1) the rest of `T` and (2) either the rest of
 /// the conversion specification (for specifications with `*`) or the
 /// rest of the format string `fmt` (starting at `next_idx`).
+///
+/// # Panics
 ///
 /// Panics instead of returning `false` if `panic_on_false` is true.
 #[allow(unconditional_panic)]
@@ -255,11 +263,16 @@ const fn next_conversion_specification(fmt: &[c_char], start_idx: usize) -> Opti
     None
 }
 
-/// If `fmt` has an acceptable printf(3) conversion specification starting
+/// If `fmt` has an acceptable `printf(3)` conversion specification starting
 /// at index `start_idx`,
 /// returns a pair consisting of a [`ConversionSpecification`] describing the
 /// specification and a `usize` containing the index of the
-/// first character after the specification; otherwise returns `Err`.
+/// first character after the specification.
+///
+/// # Errors
+///
+/// Returns `Err(())` if `fmt` does not have an acceptable conversion specification
+/// starting at `start_idx`.
 const fn parse_conversion_specification(
     fmt: &[c_char],
     start_idx: usize,

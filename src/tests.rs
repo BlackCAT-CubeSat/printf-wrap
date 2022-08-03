@@ -86,7 +86,7 @@ generate_successful_case! {
 }
 
 /// Tests checking that we are indeed passing arguments the right way
-/// to the C function we're wrapping, using snprintf(3) as our guinea pig.
+/// to the C function we're wrapping, using `snprintf(3)` as our guinea pig.
 mod abi_check {
     use crate::example::*;
 

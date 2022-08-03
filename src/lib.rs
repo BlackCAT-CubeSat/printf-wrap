@@ -1,7 +1,7 @@
 // Copyright (c) 2021-2022 The Pennsylvania State University and the project contributors.
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! Types and functions for safe use of printf(3)-style format strings.
+//! Types and functions for the safe use of `printf(3)`-style format strings.
 //!
 //! `printf(3)` ([POSIX], [Linux], and [FreeBSD] man pages) and its variants
 //! present some challenges for memory-safe use from Rust:
@@ -36,6 +36,8 @@
 
 #![no_std]
 
+#![cfg_attr(feature = "doccfg", feature(doc_cfg))]
+
 // We only aim for compatibility with printf(3) as specified in POSIX:
 #[cfg(unix)]
 
@@ -48,7 +50,7 @@ struct CompatibleSystem {}
 extern crate libc;
 
 // We optionally provide support for a couple of relevant types in `std`.
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", doc))]
 extern crate std;
 
 use core::marker::PhantomData;
@@ -60,7 +62,7 @@ use crate::validate::is_fmt_valid_for_args;
 /// Traits used to implement private details of [sealed traits].
 ///
 /// [sealed traits]: https://rust-lang.github.io/api-guidelines/future-proofing.html
-mod private {
+pub(crate) mod private {
     /// Marker trait for [`PrintfArgument`](`super::PrintfArgument`).
     pub trait PrintfArgumentPrivate {}
 }
@@ -71,16 +73,21 @@ mod validate;
 
 /// A wrapper for a `'static` null-terminated string.
 ///
-/// Sometimes used in favor of `std`'s `CStr` or `CString` types,
-/// as these can be made as compile-time constants.
+/// Sometimes used in favor of [`std`]'s
+/// [`CStr`](std::ffi::CStr) or [`CString`](std::ffi::CString) types,
+/// as [`NullString`]s can be made as compile-time constants.
 #[derive(Clone, Copy)]
 pub struct NullString {
     s: *const c_char,
 }
 
 impl NullString {
-    /// Creates a [`NullString`] from a `s`, a static [`&str`](str),
+    /// Creates a [`NullString`] from `s`
     /// or panics if `s` is not null-terminated.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the string `s` does not end in the null character.
     #[allow(unconditional_panic)]
     #[deny(const_err)]
     pub const fn new(s: &'static str) -> NullString {
@@ -98,15 +105,17 @@ impl NullString {
         self.s
     }
 
-    /// Returns a `&`[`std::ffi::CStr`] pointing to the wrapped string.
-    #[cfg(feature = "std")]
+    /// Returns a `&`[`CStr`](std::ffi::CStr) pointing to the wrapped string.
+    #[cfg(any(feature = "std", all(doc, feature = "doccfg")))]
+    #[cfg_attr(feature = "doccfg", doc(cfg(feature = "std")))]
     #[inline]
     pub fn as_cstr(self) -> &'static std::ffi::CStr {
         unsafe { std::ffi::CStr::from_ptr(self.s) }
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", all(doc, feature = "doccfg")))]
+#[cfg_attr(feature = "doccfg", doc(cfg(feature = "std")))]
 impl From<&'static std::ffi::CStr> for NullString {
     #[inline]
     fn from(cstr: &'static std::ffi::CStr) -> Self {
@@ -114,7 +123,8 @@ impl From<&'static std::ffi::CStr> for NullString {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", all(doc, feature = "doccfg")))]
+#[cfg_attr(feature = "doccfg", doc(cfg(feature = "std")))]
 impl From<NullString> for &'static std::ffi::CStr {
     #[inline]
     fn from(nstr: NullString) -> Self {
@@ -122,17 +132,17 @@ impl From<NullString> for &'static std::ffi::CStr {
     }
 }
 
-/// Convenience macro for creating a [`NullString`]; it appends a null
-/// character for you!
+/// Convenience macro for creating a `const` [`NullString`],
+/// including appending a null character.
 #[macro_export]
 macro_rules! null_str {
-    ($str:expr) => {{
+    ($str:literal) => {{
         const STR: $crate::NullString = $crate::NullString::new(concat!($str, "\0"));
         STR
     }};
 }
 
-/// A Rust-side argument to a safe wrapper around a printf(3)-like function.
+/// A Rust-side argument to a safe wrapper around a `printf(3)`-like function.
 ///
 /// This is a [sealed trait]; consumers of this crate are not allowed
 /// to create their own `impl`s in order to unconditionally preserve
@@ -140,11 +150,11 @@ macro_rules! null_str {
 ///
 /// [sealed trait]: https://rust-lang.github.io/api-guidelines/future-proofing.html
 pub trait PrintfArgument: PrintfArgumentPrivate + Copy {
-    /// The type corresponding to `Self` we should _really_ send as
-    /// an argument to a printf(3)-like function.
+    /// The C type corresponding to `Self` that we should _really_ send
+    /// as an argument to a `printf(3)`-like function.
     type CPrintfType;
 
-    /// Converts `self` to a value suitable for sending to printf(3).
+    /// Converts `self` to a value suitable for sending to `printf(3)`.
     fn as_c_val(self) -> Self::CPrintfType;
 
     /// Whether the type is consistent with C's `char`.
@@ -193,6 +203,9 @@ const fn is_compat<T: Sized, U: Sized>() -> bool {
 }
 
 /// Utility trait for determining which of two integer types is larger.
+///
+/// The type alias [`LargerOf`] is usually more convenient to use outside
+/// of implementations of this trait.
 pub trait LargerOfOp<Rhs> {
     /// If `Rhs` is a larger type than `Self`, this should be `Rhs`; otherwise
     /// it should be `Self`.
@@ -203,7 +216,7 @@ pub trait LargerOfOp<Rhs> {
 /// function.
 pub type LargerOf<T, U> = <T as LargerOfOp<U>>::Output;
 
-/// A list of Rust-side arguments to a printf(3)-style function.
+/// A list of Rust-side arguments to a `printf(3)`-style function.
 pub trait PrintfArgs {
     /// The [`PrintfArgsList`] equivalent to `Self`.
     type AsList: PrintfArgsList;
@@ -211,16 +224,21 @@ pub trait PrintfArgs {
 
 /// A [`PrintfArgs`] in a form more amenable to recursive processing.
 pub trait PrintfArgsList {
+    /// Whether this type represents an empty list.
     const IS_EMPTY: bool;
 
+    /// The first element of the list.
     type First: PrintfArgument;
+    /// The elements of the list after the first.
     type Rest: PrintfArgsList;
 }
 
 impl PrintfArgsList for () {
     const IS_EMPTY: bool = true;
 
-    type First = u8; // not really, but to fulfil the type constraint, we need *something* here.
+    /// This isn't _really_ the first element of an empty list,
+    /// but to fulfil the type constraint, we need _something_ here.
+    type First = u8;
     type Rest = ();
 }
 
@@ -271,7 +289,7 @@ make_printf_arguments_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O);
 make_printf_arguments_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P);
 
 /// A type-safe wrapper around a C-style string verified to be compatible
-/// with use as a format string for printf(3)-style functions called with
+/// with use as a format string for `printf(3)`-style functions called with
 /// `T` as the varargs.
 pub struct PrintfFmt<T: PrintfArgs> {
     fmt: *const c_char,
@@ -288,9 +306,13 @@ const fn c(x: u8) -> c_char {
 const EMPTY_C_STRING: *const c_char = &c(b'\0') as *const c_char;
 
 impl<T: PrintfArgs> PrintfFmt<T> {
-    /// If `fmt` represents a valid, supported format string for printf(3)
+    /// If `fmt` represents a valid, supported format string for `printf(3)`
     /// when given Rust-side arguments `T`, returns a [`PrintfFmt`];
     /// panics otherwise.
+    ///
+    /// # Panics
+    ///
+    /// See above.
     #[allow(unconditional_panic)]
     #[inline]
     pub const fn new_or_panic(fmt: &'static str) -> Self {
@@ -314,9 +336,13 @@ impl<T: PrintfArgs> PrintfFmt<T> {
         PrintfFmt { fmt: s, _x: CompatibleSystem {}, _y: PhantomData }
     }
 
-    /// If `fmt` represents a valid, supported format string for printf(3)
-    /// when given Rust-side arguments `T`, returns it as `Ok(`[`PrintfFmt`]`)`;
-    /// returns `Err(())` otherwise.
+    /// If `fmt` represents a valid, supported format string for `printf(3)`
+    /// when given Rust-side arguments `T`, returns it as a [`PrintfFmt`].
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(())` if `fmt` is _not_ a valid, supported format string
+    /// corresponding to varargs `T`.
     #[inline]
     pub const fn new(fmt: &'static str) -> Result<Self, ()> {
         if !is_compat::<u8, c_char>() {
@@ -354,7 +380,7 @@ impl<T: PrintfArgs> Copy for PrintfFmt<T> {}
 
 /// Returns whether `fmt` is (1) a valid C-style string and (2) a format
 /// string compatible with the tuple of arguments `T` when used in a
-/// printf(3)-like function.
+/// `printf(3)`-like function.
 #[deny(unconditional_panic)]
 #[inline]
 pub const fn is_fmt_valid<T: PrintfArgs>(fmt: &[c_char]) -> bool {
@@ -362,7 +388,7 @@ pub const fn is_fmt_valid<T: PrintfArgs>(fmt: &[c_char]) -> bool {
 }
 
 /// An example of how to use the types and traits of this crate to safely
-/// wrap functions with printf(3)-style format strings and varargs.
+/// wrap functions with `printf(3)`-style format strings and varargs.
 pub mod example {
     use crate::{PrintfArgument, PrintfFmt};
     use libc::{c_char, c_int};
