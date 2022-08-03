@@ -35,7 +35,6 @@
 //! [FreeBSD]: https://www.freebsd.org/cgi/man.cgi?printf%283%29
 
 #![no_std]
-
 #![cfg_attr(feature = "doccfg", feature(doc_cfg))]
 
 // We only aim for compatibility with printf(3) as specified in POSIX:
