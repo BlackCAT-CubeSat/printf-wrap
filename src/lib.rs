@@ -20,8 +20,33 @@
 //! `(A: `[`PrintfArgument`]`, B: `[`PrintfArgument`]`, ...)`.
 //! This verification may be performed at
 //! compile time, allowing for safe wrappers with zero runtime overhead.
-//! An example of how to do so, using `printf(3)` and `snprintf(3)` as the
-//! functions to wrap, can be found in the [`example`] module.
+//!
+//! A brief example of how this crate might be used:
+//!
+//! ```no_run
+//! use printf_wrap::{PrintfFmt, PrintfArgument};
+//! use libc::{c_int, printf};
+//!
+//! pub fn printf_with_2_args<T, U>(fmt: PrintfFmt<(T, U)>, arg1: T, arg2: U) -> c_int
+//! where
+//!     T: PrintfArgument,
+//!     U: PrintfArgument,
+//! {
+//!     unsafe { libc::printf(fmt.as_ptr(), arg1.as_c_val(), arg2.as_c_val()) }
+//! }
+//!
+//! fn main() {
+//!     const MY_FMT: PrintfFmt<(u32, i32)> =
+//!         PrintfFmt::new_or_panic("unsigned = %u, signed = %d\0");
+//!     printf_with_2_args(MY_FMT, 42, -7);
+//! }
+//! ```
+//!
+//! The
+#![cfg_attr(any(feature = "example", all(doc, feature = "doccfg")), doc = " [`example`]")]
+#![cfg_attr(not(any(feature = "example", all(doc, feature = "doccfg"))), doc = " `example`")]
+//! module has a more worked-out example of this crate's use, using
+//! `printf(3)` and `snprintf(3)` as the functions to wrap.
 //!
 //! Only a subset of all possible `printf` format strings are accepted:
 //!
@@ -59,7 +84,7 @@ use crate::validate::is_fmt_valid_for_args;
 
 /// Traits used to implement private details of [sealed traits].
 ///
-/// [sealed traits]: https://rust-lang.github.io/api-guidelines/future-proofing.html
+/// [sealed traits]: https://rust-lang.github.io/api-guidelines/future-proofing.html#c-sealed
 pub(crate) mod private {
     /// Marker trait for [`PrintfArgument`](`super::PrintfArgument`).
     pub trait PrintfArgumentPrivate {}
@@ -146,7 +171,7 @@ macro_rules! null_str {
 /// to create their own `impl`s in order to unconditionally preserve
 /// safety.
 ///
-/// [sealed trait]: https://rust-lang.github.io/api-guidelines/future-proofing.html
+/// [sealed trait]: https://rust-lang.github.io/api-guidelines/future-proofing.html#c-sealed
 pub trait PrintfArgument: PrintfArgumentPrivate + Copy {
     /// The C type corresponding to `Self` that we should _really_ send
     /// as an argument to a `printf(3)`-like function.
