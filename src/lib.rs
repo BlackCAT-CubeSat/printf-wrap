@@ -39,10 +39,9 @@
 
 // We only aim for compatibility with printf(3) as specified in POSIX:
 #[cfg(unix)]
-
 /// Marker structure used to ensure this crate only sucessfully compiles for
 /// known-compatible systems.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct CompatibleSystem {}
 
 // We use `libc` for types.
@@ -75,7 +74,7 @@ mod validate;
 /// Sometimes used in favor of [`std`]'s
 /// [`CStr`](std::ffi::CStr) or [`CString`](std::ffi::CString) types,
 /// as [`NullString`]s can be made as compile-time constants.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct NullString {
     s: *const c_char,
 }
@@ -290,6 +289,7 @@ make_printf_arguments_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P);
 /// A type-safe wrapper around a C-style string verified to be compatible
 /// with use as a format string for `printf(3)`-style functions called with
 /// `T` as the varargs.
+#[derive(Debug)]
 pub struct PrintfFmt<T: PrintfArgs> {
     fmt: *const c_char,
     _x: CompatibleSystem,
