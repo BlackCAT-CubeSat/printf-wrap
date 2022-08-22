@@ -160,7 +160,7 @@ impl From<NullString> for &'static std::ffi::CStr {
 /// including appending a null character.
 #[macro_export]
 macro_rules! null_str {
-    ($str:literal) => {{
+    ($str:expr) => {{
         const STR: $crate::NullString = $crate::NullString::new(concat!($str, "\0"));
         STR
     }};
