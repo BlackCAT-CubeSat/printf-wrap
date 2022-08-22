@@ -412,7 +412,7 @@ pub const fn is_fmt_valid<T: PrintfArgs>(fmt: &[c_char]) -> bool {
     is_fmt_valid_for_args::<T>(fmt, false)
 }
 
-#[cfg(any(feature = "example", all(doc, feature = "doccfg")))]
+#[cfg(any(feature = "example", all(doc, feature = "doccfg"), test))]
 #[cfg_attr(feature = "doccfg", doc(cfg(feature = "example")))]
 pub mod example;
 
