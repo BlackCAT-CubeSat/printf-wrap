@@ -6,8 +6,7 @@
 use crate::{is_compat, LargerOf, NullString};
 use crate::{PrintfArgument, PrintfArgumentPrivate};
 
-use core::ffi::{c_void, CStr};
-use libc::{c_char, c_double, c_int, c_uint};
+use core::ffi::{c_char, c_double, c_int, c_uint, c_void, CStr};
 
 macro_rules! impl_empty_trait {
     ($trait_name:ident ; $($implementor:ty),*) => {
@@ -28,11 +27,11 @@ macro_rules! impl_printf_arg_integer {
             impl PrintfArgument for $t {
                 const IS_SIGNED: bool = $signed;
 
-                const IS_CHAR: bool      = is_compat::<$t, libc::c_char>();
-                const IS_SHORT: bool     = is_compat::<$t, libc::c_short>();
-                const IS_INT: bool       = is_compat::<$t, libc::c_int>();
-                const IS_LONG: bool      = is_compat::<$t, libc::c_long>();
-                const IS_LONG_LONG: bool = is_compat::<$t, libc::c_longlong>();
+                const IS_CHAR: bool      = is_compat::<$t, core::ffi::c_char>();
+                const IS_SHORT: bool     = is_compat::<$t, core::ffi::c_short>();
+                const IS_INT: bool       = is_compat::<$t, core::ffi::c_int>();
+                const IS_LONG: bool      = is_compat::<$t, core::ffi::c_long>();
+                const IS_LONG_LONG: bool = is_compat::<$t, core::ffi::c_longlong>();
 
                 const IS_SIZE: bool      = is_compat::<$t, libc::size_t>();
                 const IS_MAX: bool       = is_compat::<$t, libc::intmax_t>();

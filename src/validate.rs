@@ -3,7 +3,7 @@
 
 //! Utilities for the validation of the content of candidate format strings.
 
-use libc::c_char;
+use core::ffi::c_char;
 
 use crate::{c, PrintfArgs, PrintfArgsList, PrintfArgument};
 

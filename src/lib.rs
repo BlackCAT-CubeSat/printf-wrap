@@ -76,9 +76,8 @@ extern crate libc;
 #[cfg(any(test, doc))]
 extern crate alloc;
 
-use core::ffi::CStr;
+use core::ffi::{c_char, CStr};
 use core::marker::PhantomData;
-use libc::c_char;
 
 use crate::private::PrintfArgumentPrivate;
 use crate::validate::is_fmt_valid_for_args;
@@ -323,7 +322,7 @@ pub struct PrintfFmt<T: PrintfArgs> {
     _y: PhantomData<T>,
 }
 
-/// Utility conversion from [`u8`] to [`libc::c_char`].
+/// Utility conversion from [`u8`] to [`c_char`].
 const fn c(x: u8) -> c_char {
     x as c_char
 }
@@ -403,6 +402,12 @@ impl<T: PrintfArgs> Clone for PrintfFmt<T> {
 }
 
 impl<T: PrintfArgs> Copy for PrintfFmt<T> {}
+
+impl<T: PrintfArgs> AsRef<CStr> for PrintfFmt<T> {
+    fn as_ref(&self) -> &CStr {
+        unsafe { CStr::from_ptr(self.fmt) }
+    }
+}
 
 /// Returns whether `fmt` is (1) a valid C-style string and (2) a format
 /// string compatible with the tuple of arguments `T` when used in a
