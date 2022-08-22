@@ -1,3 +1,6 @@
+// Copyright (c) 2021-2022 The Pennsylvania State University and the project contributors.
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 //! An example of how to use the types and traits of this crate to safely
 //! wrap functions with `printf(3)`-style format strings and varargs.
 
