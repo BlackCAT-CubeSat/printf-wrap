@@ -120,8 +120,8 @@ mod abi_check {
                     $( $arg ),*
                 );
                 assert_eq!(
-                    std::str::from_utf8(p),
-                    std::str::from_utf8($expected),
+                    alloc::str::from_utf8(p),
+                    alloc::str::from_utf8($expected),
                     "snprintf was not given the arguments correctly"
                 );
             }

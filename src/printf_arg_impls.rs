@@ -6,7 +6,7 @@
 use crate::{is_compat, LargerOf, NullString};
 use crate::{PrintfArgument, PrintfArgumentPrivate};
 
-use core::ffi::c_void;
+use core::ffi::{c_void, CStr};
 use libc::{c_char, c_double, c_int, c_uint};
 
 macro_rules! impl_empty_trait {
@@ -98,37 +98,17 @@ impl PrintfArgument for NullString {
     }
 }
 
-#[cfg(any(feature = "std", all(doc, feature = "doccfg")))]
-#[cfg_attr(feature = "doccfg", doc(cfg(feature = "std")))]
-impl PrintfArgumentPrivate for &std::ffi::CStr {}
+impl<T: AsRef<CStr>> PrintfArgumentPrivate for &T {}
 
-#[cfg(any(feature = "std", all(doc, feature = "doccfg")))]
-#[cfg_attr(feature = "doccfg", doc(cfg(feature = "std")))]
-impl PrintfArgument for &std::ffi::CStr {
+impl<T: AsRef<CStr>> PrintfArgument for &T {
     type CPrintfType = *const c_char;
 
     const IS_C_STRING: bool = true;
 
     #[inline]
     fn as_c_val(self) -> *const c_char {
-        self.as_ptr()
-    }
-}
-
-#[cfg(any(feature = "std", all(doc, feature = "doccfg")))]
-#[cfg_attr(feature = "doccfg", doc(cfg(feature = "std")))]
-impl PrintfArgumentPrivate for &std::ffi::CString {}
-
-#[cfg(any(feature = "std", all(doc, feature = "doccfg")))]
-#[cfg_attr(feature = "doccfg", doc(cfg(feature = "std")))]
-impl PrintfArgument for &std::ffi::CString {
-    type CPrintfType = *const c_char;
-
-    const IS_C_STRING: bool = true;
-
-    #[inline]
-    fn as_c_val(self) -> *const c_char {
-        self.as_ptr()
+        let cs: &CStr = self.as_ref();
+        cs.as_ptr()
     }
 }
 

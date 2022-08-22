@@ -70,13 +70,13 @@
 #[derive(Clone, Copy, Debug)]
 struct CompatibleSystem {}
 
-// We use `libc` for types.
+// We use `libc` for types, and (in the `example` module) for functions from the C standard library.
 extern crate libc;
 
-// We optionally provide support for a couple of relevant types in `std`.
-#[cfg(any(feature = "std", doc))]
-extern crate std;
+#[cfg(any(test, doc))]
+extern crate alloc;
 
+use core::ffi::CStr;
 use core::marker::PhantomData;
 use libc::c_char;
 
@@ -97,8 +97,8 @@ mod validate;
 
 /// A wrapper for a `'static` null-terminated string.
 ///
-/// Sometimes used in favor of [`std`]'s
-/// [`CStr`](std::ffi::CStr) or [`CString`](std::ffi::CString) types,
+/// Sometimes used in favor of
+/// [`CStr`](core::ffi::CStr) or [`CString`](alloc::ffi::CString),
 /// as [`NullString`]s can be made as compile-time constants.
 #[derive(Clone, Copy, Debug)]
 pub struct NullString {
@@ -129,30 +129,31 @@ impl NullString {
         self.s
     }
 
-    /// Returns a `&`[`CStr`](std::ffi::CStr) pointing to the wrapped string.
-    #[cfg(any(feature = "std", all(doc, feature = "doccfg")))]
-    #[cfg_attr(feature = "doccfg", doc(cfg(feature = "std")))]
+    /// Returns a `&`[`CStr`] pointing to the wrapped string.
     #[inline]
-    pub fn as_cstr(self) -> &'static std::ffi::CStr {
-        unsafe { std::ffi::CStr::from_ptr(self.s) }
+    pub fn as_cstr(self) -> &'static CStr {
+        unsafe { CStr::from_ptr(self.s) }
     }
 }
 
-#[cfg(any(feature = "std", all(doc, feature = "doccfg")))]
-#[cfg_attr(feature = "doccfg", doc(cfg(feature = "std")))]
-impl From<&'static std::ffi::CStr> for NullString {
+impl From<&'static CStr> for NullString {
     #[inline]
-    fn from(cstr: &'static std::ffi::CStr) -> Self {
+    fn from(cstr: &'static CStr) -> Self {
         NullString { s: cstr.as_ptr() }
     }
 }
 
-#[cfg(any(feature = "std", all(doc, feature = "doccfg")))]
-#[cfg_attr(feature = "doccfg", doc(cfg(feature = "std")))]
-impl From<NullString> for &'static std::ffi::CStr {
+impl From<NullString> for &'static CStr {
     #[inline]
     fn from(nstr: NullString) -> Self {
         nstr.as_cstr()
+    }
+}
+
+impl AsRef<CStr> for NullString {
+    #[inline]
+    fn as_ref(&self) -> &CStr {
+        self.as_cstr()
     }
 }
 
