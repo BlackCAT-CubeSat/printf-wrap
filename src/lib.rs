@@ -55,6 +55,8 @@
 //!   supported.
 //! * `%lc`, `%ls`, `%C`, `%S`, and `%L[fFeEgGaA]` are not supported.
 //! * `%n` is not supported.
+//! * The `j`, `z`, and `t` length modifiers are only supported
+//!   if crate feature **`libc`** is enabled.
 //!
 //! [POSIX]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/printf.html
 //! [Linux]: https://man7.org/linux/man-pages/man3/printf.3.html
@@ -70,7 +72,9 @@
 #[derive(Clone, Copy, Debug)]
 struct CompatibleSystem {}
 
-// We use `libc` for types, and (in the `example` module) for functions from the C standard library.
+// We optionally use `libc` for types and (in the `example` module)
+// for functions from the C standard library.
+#[cfg(any(feature = "libc", feature = "example", test, all(doc, feature = "doccfg")))]
 extern crate libc;
 
 #[cfg(any(test, doc))]
@@ -192,10 +196,16 @@ pub trait PrintfArgument: PrintfArgumentPrivate + Copy {
     /// Whether the type is consistent with C's `long long int`.
     const IS_LONG_LONG: bool = false;
     /// Whether the type is consistent with C's `size_t`.
+    #[cfg(any(feature = "libc", test, all(doc, feature = "doccfg")))]
+    #[cfg_attr(feature = "doccfg", doc(cfg(feature = "libc")))]
     const IS_SIZE: bool = false;
     /// Whether the type is consistent with C's `intmax_t`.
+    #[cfg(any(feature = "libc", test, all(doc, feature = "doccfg")))]
+    #[cfg_attr(feature = "doccfg", doc(cfg(feature = "libc")))]
     const IS_MAX: bool = false;
     /// Whether the type is consistent with C's `ptrdiff_t`.
+    #[cfg(any(feature = "libc", test, all(doc, feature = "doccfg")))]
+    #[cfg_attr(feature = "doccfg", doc(cfg(feature = "libc")))]
     const IS_PTRDIFF: bool = false;
 
     /// Whether the type is a signed integer type, as opposed to unsigned.

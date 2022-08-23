@@ -12,15 +12,17 @@ keywords = ["printf", "ffi", "c", "no_std"]
 rust-version = "1.64.0"
 
 [dependencies]
-libc = { version = "^0.2.0", default-features = false }
+libc = { version = "^0.2.0", default-features = false, optional = true }
 
 [features]
-# use the nightly-only #[doc(cfg(...))]:
-doccfg = []
+# use types currently available only from `libc` and not `core::ffi`
+libc = ["dep:libc"]
 # include the "example" module
-example = []
+example = ["dep:libc"]
+# use the nightly-only #[doc(cfg(...))]; intended for use when generating docs
+doccfg = ["dep:libc"]
 
 [package.metadata.docs.rs]
-features = ["example", "doccfg"]
+features = ["libc", "example", "doccfg"]
 default-target = "x86_64-unknown-linux-gnu"
 targets = ["x86_64-apple-darwin", "x86_64-unknown-freebsd", "x86_64-unknown-illumos"]

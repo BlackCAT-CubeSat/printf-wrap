@@ -55,10 +55,13 @@ enum LengthModifier {
     /// `L`
     LongDouble,
     /// `j`
+    #[cfg(any(feature = "libc", test, all(doc, feature = "doccfg")))]
     Max,
     /// `z`
+    #[cfg(any(feature = "libc", test, all(doc, feature = "doccfg")))]
     Size,
     /// `t`
+    #[cfg(any(feature = "libc", test, all(doc, feature = "doccfg")))]
     Ptrdiff,
 }
 
@@ -191,8 +194,11 @@ const fn does_convspec_match_arg<T: PrintfArgsList>(
                 Some(LM::Short) => T::First::IS_SHORT,
                 Some(LM::Long) => T::First::IS_LONG,
                 Some(LM::LongLong) => T::First::IS_LONG_LONG,
+                #[cfg(any(feature = "libc", test, all(doc, feature = "doccfg")))]
                 Some(LM::Max) => T::First::IS_MAX,
+                #[cfg(any(feature = "libc", test, all(doc, feature = "doccfg")))]
                 Some(LM::Size) => T::First::IS_SIZE,
+                #[cfg(any(feature = "libc", test, all(doc, feature = "doccfg")))]
                 Some(LM::Ptrdiff) => T::First::IS_PTRDIFF,
                 Some(LM::LongDouble) => false,
             };
@@ -373,14 +379,17 @@ const fn parse_conversion_specification(
                 Some(Long)
             }
         }
+        #[cfg(any(feature = "libc", test, all(doc, feature = "doccfg")))]
         b'j' => {
             i += 1;
             Some(Max)
         }
+        #[cfg(any(feature = "libc", test, all(doc, feature = "doccfg")))]
         b'z' => {
             i += 1;
             Some(Size)
         }
+        #[cfg(any(feature = "libc", test, all(doc, feature = "doccfg")))]
         b't' => {
             i += 1;
             Some(Ptrdiff)

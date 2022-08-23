@@ -33,8 +33,13 @@ macro_rules! impl_printf_arg_integer {
                 const IS_LONG: bool      = is_compat::<$t, core::ffi::c_long>();
                 const IS_LONG_LONG: bool = is_compat::<$t, core::ffi::c_longlong>();
 
+                #[cfg(any(feature = "libc", test, all(doc, feature = "doccfg")))]
                 const IS_SIZE: bool      = is_compat::<$t, libc::size_t>();
+
+                #[cfg(any(feature = "libc", test, all(doc, feature = "doccfg")))]
                 const IS_MAX: bool       = is_compat::<$t, libc::intmax_t>();
+
+                #[cfg(any(feature = "libc", test, all(doc, feature = "doccfg")))]
                 const IS_PTRDIFF: bool   = is_compat::<$t, libc::ptrdiff_t>();
 
                 type CPrintfType = LargerOf<Self, $int_type>;

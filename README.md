@@ -42,12 +42,12 @@ values to C-compatible equivalents.
 
 ## Features
 
-**std** &ndash; enables support for the [`CStr`] and [`CString`] types from [`std`].
-Enabled by default; if you want to use this crate in `#[no_std]` environments,
-[`default-features = false`] in the dependency declaration is your friend.
+**`libc`** &ndash; enables support relating to the C types
+`size_t`, `intmax_t`, and `ptrdiff_t`; requires the [`libc`] crate.
 
-**example** &ndash; enables a demonstration of the use of `printf-wrap`
-with some wrappers around functions from the C standard library.
+**`example`** &ndash; enables a demonstration of the use of `printf-wrap`
+with some wrappers around functions from the C standard library; also
+requires the [`libc`] crate.
 
 ## License
 
@@ -55,7 +55,4 @@ This crate is licensed under either of the [MIT license](LICENSE-MIT)
 or the [Apache License version 2.0](LICENSE-Apache-2.0) at your option.
 
 [`printf(3)`]: https://man7.org/linux/man-pages/man3/printf.3.html
-[`std`]: https://doc.rust-lang.org/std/index.html
-[`CStr`]: https://doc.rust-lang.org/std/ffi/type.CStr.html
-[`CString`]: https://doc.rust-lang.org/std/ffi/type.CString.html
-[`default-features = false`]: https://doc.rust-lang.org/cargo/reference/features.html#dependency-features
+[`libc`]: https://crates.io/crates/libc
