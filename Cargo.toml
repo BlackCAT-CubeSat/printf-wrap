@@ -14,6 +14,9 @@ rust-version = "1.64.0"
 [dependencies]
 libc = { version = "^0.2.0", default-features = false, optional = true }
 
+[dev-dependencies]
+libc = { version = "^0.2.0", default-features = false }
+
 [features]
 # use types currently available only from `libc` and not `core::ffi`
 libc = ["dep:libc"]
