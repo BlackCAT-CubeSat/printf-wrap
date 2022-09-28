@@ -105,6 +105,7 @@ mod validate;
 /// as [`NullString`]s can be made as compile-time constants.
 #[derive(Clone, Copy, Debug)]
 pub struct NullString {
+    /// A pointer to a `'static` null-terminated string.
     s: *const c_char,
 }
 
@@ -159,6 +160,11 @@ impl AsRef<CStr> for NullString {
         self.as_cstr()
     }
 }
+
+// As the contents of a NullString are simply a pointer to a 'static string,
+// it *is*, in fact, safe to share across multiple threads:
+unsafe impl Send for NullString {}
+unsafe impl Sync for NullString {}
 
 /// Convenience macro for creating a `const` [`NullString`],
 /// including appending a null character.
@@ -327,6 +333,7 @@ make_printf_arguments_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P);
 /// `T` as the varargs.
 #[derive(Debug)]
 pub struct PrintfFmt<T: PrintfArgs> {
+    /// This must be a pointer to a `'static` null-terminated string.
     fmt: *const c_char,
     _x: CompatibleSystem,
     _y: PhantomData<T>,
@@ -418,6 +425,11 @@ impl<T: PrintfArgs> AsRef<CStr> for PrintfFmt<T> {
         unsafe { CStr::from_ptr(self.fmt) }
     }
 }
+
+// As the contents of a PrintfFmt<T> are just a pointer to a 'static string
+// and some thread-safe ZSTs, it is actually thread-safe:
+unsafe impl<T: PrintfArgs> Send for PrintfFmt<T> {}
+unsafe impl<T: PrintfArgs> Sync for PrintfFmt<T> {}
 
 /// Returns whether `fmt` is (1) a valid C-style string and (2) a format
 /// string compatible with the tuple of arguments `T` when used in a
