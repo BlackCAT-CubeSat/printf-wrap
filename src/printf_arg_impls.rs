@@ -6,8 +6,7 @@
 use crate::{is_compat, LargerOf, NullString};
 use crate::{PrintfArgument, PrintfArgumentPrivate};
 
-use core::ffi::c_void;
-use libc::{c_char, c_double, c_int, c_uint};
+use core::ffi::{c_char, c_double, c_int, c_uint, c_void, CStr};
 
 macro_rules! impl_empty_trait {
     ($trait_name:ident ; $($implementor:ty),*) => {
@@ -28,14 +27,19 @@ macro_rules! impl_printf_arg_integer {
             impl PrintfArgument for $t {
                 const IS_SIGNED: bool = $signed;
 
-                const IS_CHAR: bool      = is_compat::<$t, libc::c_char>();
-                const IS_SHORT: bool     = is_compat::<$t, libc::c_short>();
-                const IS_INT: bool       = is_compat::<$t, libc::c_int>();
-                const IS_LONG: bool      = is_compat::<$t, libc::c_long>();
-                const IS_LONG_LONG: bool = is_compat::<$t, libc::c_longlong>();
+                const IS_CHAR: bool      = is_compat::<$t, core::ffi::c_char>();
+                const IS_SHORT: bool     = is_compat::<$t, core::ffi::c_short>();
+                const IS_INT: bool       = is_compat::<$t, core::ffi::c_int>();
+                const IS_LONG: bool      = is_compat::<$t, core::ffi::c_long>();
+                const IS_LONG_LONG: bool = is_compat::<$t, core::ffi::c_longlong>();
 
+                #[cfg(any(feature = "libc", test, all(doc, feature = "doccfg")))]
                 const IS_SIZE: bool      = is_compat::<$t, libc::size_t>();
+
+                #[cfg(any(feature = "libc", test, all(doc, feature = "doccfg")))]
                 const IS_MAX: bool       = is_compat::<$t, libc::intmax_t>();
+
+                #[cfg(any(feature = "libc", test, all(doc, feature = "doccfg")))]
                 const IS_PTRDIFF: bool   = is_compat::<$t, libc::ptrdiff_t>();
 
                 type CPrintfType = LargerOf<Self, $int_type>;
@@ -98,37 +102,17 @@ impl PrintfArgument for NullString {
     }
 }
 
-#[cfg(any(feature = "std", all(doc, feature = "doccfg")))]
-#[cfg_attr(feature = "doccfg", doc(cfg(feature = "std")))]
-impl PrintfArgumentPrivate for &std::ffi::CStr {}
+impl<T: AsRef<CStr>> PrintfArgumentPrivate for &T {}
 
-#[cfg(any(feature = "std", all(doc, feature = "doccfg")))]
-#[cfg_attr(feature = "doccfg", doc(cfg(feature = "std")))]
-impl PrintfArgument for &std::ffi::CStr {
+impl<T: AsRef<CStr>> PrintfArgument for &T {
     type CPrintfType = *const c_char;
 
     const IS_C_STRING: bool = true;
 
     #[inline]
     fn as_c_val(self) -> *const c_char {
-        self.as_ptr()
-    }
-}
-
-#[cfg(any(feature = "std", all(doc, feature = "doccfg")))]
-#[cfg_attr(feature = "doccfg", doc(cfg(feature = "std")))]
-impl PrintfArgumentPrivate for &std::ffi::CString {}
-
-#[cfg(any(feature = "std", all(doc, feature = "doccfg")))]
-#[cfg_attr(feature = "doccfg", doc(cfg(feature = "std")))]
-impl PrintfArgument for &std::ffi::CString {
-    type CPrintfType = *const c_char;
-
-    const IS_C_STRING: bool = true;
-
-    #[inline]
-    fn as_c_val(self) -> *const c_char {
-        self.as_ptr()
+        let cs: &CStr = self.as_ref();
+        cs.as_ptr()
     }
 }
 

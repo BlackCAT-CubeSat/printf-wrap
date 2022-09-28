@@ -6,7 +6,7 @@
 #![cfg(test)]
 
 use crate::NullString;
-use libc::{c_char, c_int, c_long, c_uchar, c_uint, c_ulonglong, c_ushort};
+use core::ffi::{c_char, c_int, c_long, c_uchar, c_uint, c_ulonglong, c_ushort};
 
 macro_rules! generate_construction_panic_case {
     ( $( $fn_name:ident, $str:expr, $args:tt ; )* ) => {
@@ -91,7 +91,7 @@ mod abi_check {
     use crate::example::*;
 
     #[allow(unused_imports)]
-    use libc::{
+    use core::ffi::{
         c_char, c_int, c_long, c_longlong, c_short, c_uchar, c_uint, c_ulong, c_ulonglong, c_ushort,
     };
 
@@ -120,8 +120,8 @@ mod abi_check {
                     $( $arg ),*
                 );
                 assert_eq!(
-                    std::str::from_utf8(p),
-                    std::str::from_utf8($expected),
+                    alloc::str::from_utf8(p),
+                    alloc::str::from_utf8($expected),
                     "snprintf was not given the arguments correctly"
                 );
             }

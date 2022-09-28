@@ -55,6 +55,8 @@
 //!   supported.
 //! * `%lc`, `%ls`, `%C`, `%S`, and `%L[fFeEgGaA]` are not supported.
 //! * `%n` is not supported.
+//! * The `j`, `z`, and `t` length modifiers are only supported
+//!   if crate feature **`libc`** is enabled.
 //!
 //! [POSIX]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/printf.html
 //! [Linux]: https://man7.org/linux/man-pages/man3/printf.3.html
@@ -70,15 +72,16 @@
 #[derive(Clone, Copy, Debug)]
 struct CompatibleSystem {}
 
-// We use `libc` for types.
+// We optionally use `libc` for types and (in the `example` module)
+// for functions from the C standard library.
+#[cfg(any(feature = "libc", feature = "example", test, all(doc, feature = "doccfg")))]
 extern crate libc;
 
-// We optionally provide support for a couple of relevant types in `std`.
-#[cfg(any(feature = "std", doc))]
-extern crate std;
+#[cfg(any(test, doc))]
+extern crate alloc;
 
+use core::ffi::{c_char, CStr};
 use core::marker::PhantomData;
-use libc::c_char;
 
 use crate::private::PrintfArgumentPrivate;
 use crate::validate::is_fmt_valid_for_args;
@@ -97,11 +100,12 @@ mod validate;
 
 /// A wrapper for a `'static` null-terminated string.
 ///
-/// Sometimes used in favor of [`std`]'s
-/// [`CStr`](std::ffi::CStr) or [`CString`](std::ffi::CString) types,
+/// Sometimes used in favor of
+/// [`CStr`](core::ffi::CStr) or [`CString`](alloc::ffi::CString),
 /// as [`NullString`]s can be made as compile-time constants.
 #[derive(Clone, Copy, Debug)]
 pub struct NullString {
+    /// A pointer to a `'static` null-terminated string.
     s: *const c_char,
 }
 
@@ -129,32 +133,38 @@ impl NullString {
         self.s
     }
 
-    /// Returns a `&`[`CStr`](std::ffi::CStr) pointing to the wrapped string.
-    #[cfg(any(feature = "std", all(doc, feature = "doccfg")))]
-    #[cfg_attr(feature = "doccfg", doc(cfg(feature = "std")))]
+    /// Returns a `&`[`CStr`] pointing to the wrapped string.
     #[inline]
-    pub fn as_cstr(self) -> &'static std::ffi::CStr {
-        unsafe { std::ffi::CStr::from_ptr(self.s) }
+    pub fn as_cstr(self) -> &'static CStr {
+        unsafe { CStr::from_ptr(self.s) }
     }
 }
 
-#[cfg(any(feature = "std", all(doc, feature = "doccfg")))]
-#[cfg_attr(feature = "doccfg", doc(cfg(feature = "std")))]
-impl From<&'static std::ffi::CStr> for NullString {
+impl From<&'static CStr> for NullString {
     #[inline]
-    fn from(cstr: &'static std::ffi::CStr) -> Self {
+    fn from(cstr: &'static CStr) -> Self {
         NullString { s: cstr.as_ptr() }
     }
 }
 
-#[cfg(any(feature = "std", all(doc, feature = "doccfg")))]
-#[cfg_attr(feature = "doccfg", doc(cfg(feature = "std")))]
-impl From<NullString> for &'static std::ffi::CStr {
+impl From<NullString> for &'static CStr {
     #[inline]
     fn from(nstr: NullString) -> Self {
         nstr.as_cstr()
     }
 }
+
+impl AsRef<CStr> for NullString {
+    #[inline]
+    fn as_ref(&self) -> &CStr {
+        self.as_cstr()
+    }
+}
+
+// As the contents of a NullString are simply a pointer to a 'static string,
+// it *is*, in fact, safe to share across multiple threads:
+unsafe impl Send for NullString {}
+unsafe impl Sync for NullString {}
 
 /// Convenience macro for creating a `const` [`NullString`],
 /// including appending a null character.
@@ -192,10 +202,16 @@ pub trait PrintfArgument: PrintfArgumentPrivate + Copy {
     /// Whether the type is consistent with C's `long long int`.
     const IS_LONG_LONG: bool = false;
     /// Whether the type is consistent with C's `size_t`.
+    #[cfg(any(feature = "libc", test, all(doc, feature = "doccfg")))]
+    #[cfg_attr(feature = "doccfg", doc(cfg(feature = "libc")))]
     const IS_SIZE: bool = false;
     /// Whether the type is consistent with C's `intmax_t`.
+    #[cfg(any(feature = "libc", test, all(doc, feature = "doccfg")))]
+    #[cfg_attr(feature = "doccfg", doc(cfg(feature = "libc")))]
     const IS_MAX: bool = false;
     /// Whether the type is consistent with C's `ptrdiff_t`.
+    #[cfg(any(feature = "libc", test, all(doc, feature = "doccfg")))]
+    #[cfg_attr(feature = "doccfg", doc(cfg(feature = "libc")))]
     const IS_PTRDIFF: bool = false;
 
     /// Whether the type is a signed integer type, as opposed to unsigned.
@@ -317,12 +333,13 @@ make_printf_arguments_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P);
 /// `T` as the varargs.
 #[derive(Debug)]
 pub struct PrintfFmt<T: PrintfArgs> {
+    /// This must be a pointer to a `'static` null-terminated string.
     fmt: *const c_char,
     _x: CompatibleSystem,
     _y: PhantomData<T>,
 }
 
-/// Utility conversion from [`u8`] to [`libc::c_char`].
+/// Utility conversion from [`u8`] to [`c_char`].
 const fn c(x: u8) -> c_char {
     x as c_char
 }
@@ -403,6 +420,17 @@ impl<T: PrintfArgs> Clone for PrintfFmt<T> {
 
 impl<T: PrintfArgs> Copy for PrintfFmt<T> {}
 
+impl<T: PrintfArgs> AsRef<CStr> for PrintfFmt<T> {
+    fn as_ref(&self) -> &CStr {
+        unsafe { CStr::from_ptr(self.fmt) }
+    }
+}
+
+// As the contents of a PrintfFmt<T> are just a pointer to a 'static string
+// and some thread-safe ZSTs, it is actually thread-safe:
+unsafe impl<T: PrintfArgs> Send for PrintfFmt<T> {}
+unsafe impl<T: PrintfArgs> Sync for PrintfFmt<T> {}
+
 /// Returns whether `fmt` is (1) a valid C-style string and (2) a format
 /// string compatible with the tuple of arguments `T` when used in a
 /// `printf(3)`-like function.
@@ -412,7 +440,7 @@ pub const fn is_fmt_valid<T: PrintfArgs>(fmt: &[c_char]) -> bool {
     is_fmt_valid_for_args::<T>(fmt, false)
 }
 
-#[cfg(any(feature = "example", all(doc, feature = "doccfg")))]
+#[cfg(any(feature = "example", all(doc, feature = "doccfg"), test))]
 #[cfg_attr(feature = "doccfg", doc(cfg(feature = "example")))]
 pub mod example;
 
