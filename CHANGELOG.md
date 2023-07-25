@@ -1,5 +1,15 @@
 # Change Log
 
+## 0.2.1 &ndash; 2023-07-25
+
+### Changes
+
+* Implementation of `PrintfArgument` for `T: AsRef<CStr>` was changed to be for `T: AsRef<CStr> + ?Sized`
+
+### Additions
+
+* Added implementations of `LargerOfOp` related to `usize` and `isize` on architectures with 8-bit and 128-bit pointers
+
 ## 0.2.0 &ndash; 2022-09-28
 
 ### Changes
