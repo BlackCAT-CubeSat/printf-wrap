@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2022 The Pennsylvania State University and the project contributors.
+// Copyright (c) 2021-2023 The Pennsylvania State University and the project contributors.
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 //! Implementations of [`LargerOfOp`].
@@ -86,6 +86,19 @@ loo_impl! { u128 i128 : u8 i8 u16 i16 u32 i32 u64 i64 : u128 i128 : }
 loo_impl! { usize isize : : usize isize : }
 
 loo_impl! {
+    @ cfg(target_pointer_width = "8")
+    usize isize : : u8 i8 : u16 i16 u32 i32 u64 i64 u128 i128
+}
+loo_impl! {
+    @ cfg(target_pointer_width = "8")
+    u8 i8 : : usize isize :
+}
+loo_impl! {
+    @ cfg(target_pointer_width = "8")
+    u16 i16 u32 i32 u64 i64 u128 i128 : usize isize : :
+}
+
+loo_impl! {
     @ cfg(target_pointer_width = "16")
     usize isize : u8 i8 : u16 i16 : u32 i32 u64 i64 u128 i128
 }
@@ -134,4 +147,17 @@ loo_impl! {
 loo_impl! {
     @ cfg(target_pointer_width = "64")
     u128 i128 : usize isize : :
+}
+
+loo_impl! {
+    @ cfg(target_pointer_width = "128")
+    usize isize : u8 i8 u16 i16 u32 i32 u64 i64 : u128 i128 :
+}
+loo_impl! {
+    @ cfg(target_pointer_width = "128")
+    u8 i8 u16 i16 u32 i32 u64 i64 : : : usize isize
+}
+loo_impl! {
+    @ cfg(target_pointer_width = "128")
+    u128 i128 : : usize isize :
 }
