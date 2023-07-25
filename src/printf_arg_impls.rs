@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2022 The Pennsylvania State University and the project contributors.
+// Copyright (c) 2021-2023 The Pennsylvania State University and the project contributors.
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 //! Implementations of [`PrintfArgument`] and allied traits.
@@ -102,9 +102,9 @@ impl PrintfArgument for NullString {
     }
 }
 
-impl<T: AsRef<CStr>> PrintfArgumentPrivate for &T {}
+impl<T: AsRef<CStr> + ?Sized> PrintfArgumentPrivate for &T {}
 
-impl<T: AsRef<CStr>> PrintfArgument for &T {
+impl<T: AsRef<CStr> + ?Sized> PrintfArgument for &T {
     type CPrintfType = *const c_char;
 
     const IS_C_STRING: bool = true;
