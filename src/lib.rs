@@ -327,6 +327,42 @@ make_printf_arguments_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M);
 make_printf_arguments_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N);
 make_printf_arguments_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O);
 make_printf_arguments_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P);
+make_printf_arguments_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q);
+make_printf_arguments_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R);
+make_printf_arguments_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S);
+make_printf_arguments_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T);
+make_printf_arguments_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U);
+make_printf_arguments_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V);
+make_printf_arguments_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W);
+make_printf_arguments_tuple!(
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X
+);
+make_printf_arguments_tuple!(
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y
+);
+make_printf_arguments_tuple!(
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z
+);
+make_printf_arguments_tuple!(
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z, AA
+);
+make_printf_arguments_tuple!(
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z, AA, BB
+);
+make_printf_arguments_tuple!(
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z, AA, BB, CC
+);
+make_printf_arguments_tuple!(
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z, AA, BB, CC, DD
+);
+make_printf_arguments_tuple!(
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z, AA, BB, CC, DD,
+    EE
+);
+make_printf_arguments_tuple!(
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z, AA, BB, CC, DD,
+    EE, FF
+);
 
 /// A type-safe wrapper around a C-style string verified to be compatible
 /// with use as a format string for `printf(3)`-style functions called with
